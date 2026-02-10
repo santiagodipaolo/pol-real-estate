@@ -308,11 +308,15 @@ async def get_barrio_ranking(
 
     stmt = (
         select(
+            Barrio.id.label("barrio_id"),
             Barrio.name,
             Barrio.slug,
+            Barrio.comuna_id,
             metric_col.label("value"),
-            BarrioSnapshot.snapshot_date,
             BarrioSnapshot.listing_count,
+            BarrioSnapshot.median_price_usd_m2,
+            BarrioSnapshot.avg_price_usd_m2,
+            BarrioSnapshot.rental_yield_estimate,
         )
         .join(Barrio, Barrio.id == BarrioSnapshot.barrio_id)
         .join(
@@ -331,11 +335,16 @@ async def get_barrio_ranking(
     return [
         {
             "rank": idx + 1,
-            "name": row.name,
+            "barrio_id": row.barrio_id,
+            "barrio_name": row.name,
             "slug": row.slug,
-            "value": float(row.value) if row.value is not None else None,
-            "snapshot_date": row.snapshot_date.isoformat() if row.snapshot_date else None,
+            "comuna_id": row.comuna_id,
+            "value": row.value,
+            "metric": metric,
             "listing_count": row.listing_count,
+            "median_price_usd_m2": row.median_price_usd_m2,
+            "avg_price_usd_m2": row.avg_price_usd_m2,
+            "rental_yield_estimate": row.rental_yield_estimate,
         }
         for idx, row in enumerate(rows)
     ]
