@@ -118,22 +118,24 @@ async def get_choropleth_data(
 
 # ── Heatmap ───────────────────────────────────────────────────────────
 
+import random
+import math
+
 async def get_heatmap_data(
     db: AsyncSession,
     operation_type: str = "sale",
     bbox: tuple[float, float, float, float] | None = None,
 ) -> dict[str, Any]:
-    """Return heatmap points. Tries listing-level data first, falls back
-    to barrio centroid data from snapshots."""
+    """Return dense heatmap points filling each barrio polygon."""
 
-    # --- Try listing-level data first ---
+    # Try listing-level data first
     listing_points = await _heatmap_from_listings(db, operation_type, bbox)
     if listing_points:
         return {"points": listing_points, "metric": "price_usd_m2", "total": len(listing_points)}
 
-    # --- Fallback: barrio centroid data from snapshots ---
-    centroid_points = await _heatmap_from_snapshots(db, operation_type)
-    return {"points": centroid_points, "metric": "median_price_usd_m2", "total": len(centroid_points)}
+    # Fallback: fill barrio polygons with points
+    polygon_points = await _heatmap_from_polygons(db, operation_type)
+    return {"points": polygon_points, "metric": "median_price_usd_m2", "total": len(polygon_points)}
 
 
 async def _heatmap_from_listings(
@@ -190,11 +192,11 @@ async def _heatmap_from_listings(
     return _normalize_weights(points, price_m2_values)
 
 
-async def _heatmap_from_snapshots(
+async def _heatmap_from_polygons(
     db: AsyncSession,
     operation_type: str,
 ) -> list[dict[str, Any]]:
-    """Build heatmap points from barrio centroids + snapshot median price."""
+    """Fill each barrio polygon with a dense grid of points weighted by price."""
     latest_sub = (
         select(
             BarrioSnapshot.barrio_id,
@@ -207,8 +209,9 @@ async def _heatmap_from_snapshots(
 
     stmt = (
         select(
-            Barrio.centroid_lat,
-            Barrio.centroid_lon,
+            Barrio.name,
+            Barrio.geometry,
+            Barrio.area_km2,
             BarrioSnapshot.median_price_usd_m2,
             BarrioSnapshot.listing_count,
         )
@@ -219,8 +222,7 @@ async def _heatmap_from_snapshots(
             & (BarrioSnapshot.snapshot_date == latest_sub.c.max_date),
         )
         .where(
-            Barrio.centroid_lat.isnot(None),
-            Barrio.centroid_lon.isnot(None),
+            Barrio.geometry.isnot(None),
             BarrioSnapshot.operation_type == operation_type,
             BarrioSnapshot.median_price_usd_m2.isnot(None),
         )
@@ -232,31 +234,120 @@ async def _heatmap_from_snapshots(
     if not rows:
         return []
 
-    points: list[dict[str, Any]] = []
-    price_values: list[float] = []
+    all_points: list[dict[str, Any]] = []
+    all_prices: list[float] = []
 
     for row in rows:
         price = float(row.median_price_usd_m2)
-        count = int(row.listing_count) if row.listing_count else 1
-        # Create multiple points per barrio proportional to listing count
-        # to make more active barrios appear more intense
-        num_points = max(1, min(count // 5, 20))
-        for _ in range(num_points):
-            points.append({
-                "lat": float(row.centroid_lat),
-                "lon": float(row.centroid_lon),
-                "price_m2": price,
-            })
-        price_values.append(price)
+        geometry = row.geometry
+        if not geometry:
+            continue
 
-    return _normalize_weights(points, price_values)
+        # Determine point density based on barrio area
+        area = float(row.area_km2) if row.area_km2 else 2.0
+        # ~60 points per km², capped at 200 per barrio
+        target_points = min(int(area * 60), 200)
+        target_points = max(target_points, 30)
+
+        barrio_points = _fill_polygon_with_points(geometry, target_points)
+
+        for lat, lon in barrio_points:
+            all_points.append({"lat": lat, "lon": lon, "price_m2": price})
+            all_prices.append(price)
+
+    return _normalize_weights(all_points, all_prices)
+
+
+def _fill_polygon_with_points(
+    geojson: dict[str, Any],
+    target_count: int,
+) -> list[tuple[float, float]]:
+    """Generate evenly distributed points inside a GeoJSON polygon."""
+    polygons = _extract_polygon_rings(geojson)
+    if not polygons:
+        return []
+
+    # Get bounding box across all polygon rings
+    all_lons: list[float] = []
+    all_lats: list[float] = []
+    for ring in polygons:
+        for lon, lat, *_ in ring:
+            all_lons.append(lon)
+            all_lats.append(lat)
+
+    min_lon, max_lon = min(all_lons), max(all_lons)
+    min_lat, max_lat = min(all_lats), max(all_lats)
+
+    width = max_lon - min_lon
+    height = max_lat - min_lat
+    if width <= 0 or height <= 0:
+        return []
+
+    # Calculate grid spacing to get approximately target_count points
+    area = width * height
+    cell_size = math.sqrt(area / (target_count * 1.8))  # 1.8 = oversampling factor
+    if cell_size <= 0:
+        return []
+
+    points: list[tuple[float, float]] = []
+    rng = random.Random(42)  # deterministic for caching
+
+    lat = min_lat + cell_size * 0.5
+    while lat < max_lat:
+        lon = min_lon + cell_size * 0.5
+        while lon < max_lon:
+            # Add small jitter for natural look
+            jlat = lat + rng.uniform(-cell_size * 0.3, cell_size * 0.3)
+            jlon = lon + rng.uniform(-cell_size * 0.3, cell_size * 0.3)
+
+            if _point_in_any_polygon(jlon, jlat, polygons):
+                points.append((jlat, jlon))
+
+            lon += cell_size
+        lat += cell_size
+
+    return points
+
+
+def _extract_polygon_rings(geojson: dict[str, Any]) -> list[list[list[float]]]:
+    """Extract outer rings from a GeoJSON Polygon or MultiPolygon."""
+    geom_type = geojson.get("type", "")
+    coords = geojson.get("coordinates", [])
+
+    if geom_type == "Polygon" and coords:
+        return [coords[0]]  # outer ring only
+    elif geom_type == "MultiPolygon" and coords:
+        return [polygon[0] for polygon in coords if polygon]
+    return []
+
+
+def _point_in_any_polygon(
+    x: float, y: float,
+    rings: list[list[list[float]]],
+) -> bool:
+    """Check if point (x=lon, y=lat) is inside any polygon ring."""
+    return any(_point_in_ring(x, y, ring) for ring in rings)
+
+
+def _point_in_ring(x: float, y: float, ring: list[list[float]]) -> bool:
+    """Ray-casting point-in-polygon test."""
+    n = len(ring)
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i][0], ring[i][1]
+        xj, yj = ring[j][0], ring[j][1]
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
 
 
 def _normalize_weights(
     points: list[dict[str, Any]],
     price_values: list[float],
 ) -> list[dict[str, Any]]:
-    """Normalize price_m2 values into 0-1 weights."""
+    """Normalize price_m2 values into 0.1-1.0 weights."""
     if price_values:
         max_val = max(price_values)
         min_val = min(price_values)
@@ -269,7 +360,9 @@ def _normalize_weights(
     for p in points:
         weight = 0.5
         if p["price_m2"] is not None:
-            weight = (p["price_m2"] - min_val) / val_range
+            # Map to 0.15-1.0 range so even cheap areas are visible
+            raw = (p["price_m2"] - min_val) / val_range
+            weight = 0.15 + raw * 0.85
         output.append({
             "lat": p["lat"],
             "lon": p["lon"],

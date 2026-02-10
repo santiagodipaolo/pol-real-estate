@@ -78,13 +78,10 @@ export default function MapPage() {
         {viewMode === "heatmap" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-500">
             <span>Menor precio</span>
-            <div className="flex h-3 rounded-full overflow-hidden">
-              <div className="w-6 bg-indigo-200" />
-              <div className="w-6 bg-indigo-400" />
-              <div className="w-6 bg-amber-400" />
-              <div className="w-6 bg-red-400" />
-              <div className="w-6 bg-red-600" />
-            </div>
+            <div className="flex h-3 rounded-full overflow-hidden" style={{
+              background: "linear-gradient(to right, #313695, #4575b4, #abd9e9, #ffffbf, #fee090, #f46d43, #d73027, #a50026)",
+              width: "160px",
+            }} />
             <span>Mayor precio</span>
           </div>
         )}

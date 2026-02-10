@@ -17,14 +17,18 @@ export default function HeatmapLayer({
   operationType = "sale",
 }: HeatmapLayerProps) {
   const [data, setData] = useState<HeatmapResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     const load = async () => {
       try {
         const heatmap = await getHeatmapData(operationType);
         setData(heatmap);
       } catch {
         // fail silently
+      } finally {
+        setLoading(false);
       }
     };
     load();
@@ -33,11 +37,10 @@ export default function HeatmapLayer({
   useEffect(() => {
     if (!map || !data || data.points.length === 0) return;
 
-    // Remove existing layers/sources
+    // Clean previous
     if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
     if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
 
-    // Convert points to GeoJSON
     const geojson: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
       features: data.points.map((p) => ({
@@ -62,51 +65,59 @@ export default function HeatmapLayer({
       type: "heatmap",
       source: SOURCE_ID,
       paint: {
-        // Weight based on the weight property
         "heatmap-weight": [
           "interpolate",
           ["linear"],
           ["get", "weight"],
           0, 0,
+          0.5, 0.5,
           1, 1,
         ],
-        // Increase intensity as zoom level increases
         "heatmap-intensity": [
           "interpolate",
           ["linear"],
           ["zoom"],
-          10, 0.5,
-          14, 2,
+          10, 0.8,
+          12, 1.5,
+          14, 2.5,
+          16, 3.5,
         ],
-        // Color ramp from transparent to intense
         "heatmap-color": [
           "interpolate",
           ["linear"],
           ["heatmap-density"],
-          0, "rgba(0, 0, 0, 0)",
-          0.1, "rgba(99, 102, 241, 0.15)",
-          0.2, "rgba(99, 102, 241, 0.3)",
-          0.4, "rgba(79, 70, 229, 0.5)",
-          0.6, "rgba(245, 158, 11, 0.6)",
-          0.8, "rgba(239, 68, 68, 0.7)",
-          1, "rgba(220, 38, 38, 0.85)",
+          0,    "rgba(0, 0, 0, 0)",
+          0.05, "rgba(49, 54, 149, 0.25)",
+          0.1,  "rgba(69, 117, 180, 0.4)",
+          0.2,  "rgba(116, 173, 209, 0.5)",
+          0.3,  "rgba(171, 217, 233, 0.55)",
+          0.4,  "rgba(224, 243, 248, 0.6)",
+          0.5,  "rgba(255, 255, 191, 0.65)",
+          0.6,  "rgba(254, 224, 144, 0.7)",
+          0.7,  "rgba(253, 174, 97, 0.75)",
+          0.8,  "rgba(244, 109, 67, 0.8)",
+          0.9,  "rgba(215, 48, 39, 0.85)",
+          1,    "rgba(165, 0, 38, 0.9)",
         ],
-        // Radius increases with zoom
         "heatmap-radius": [
           "interpolate",
           ["linear"],
           ["zoom"],
-          10, 20,
-          12, 30,
-          14, 50,
+          10, 25,
+          11, 35,
+          12, 50,
+          13, 65,
+          14, 80,
+          15, 100,
+          16, 120,
         ],
-        // Opacity decreases slightly at higher zoom
         "heatmap-opacity": [
           "interpolate",
           ["linear"],
           ["zoom"],
-          10, 0.9,
-          14, 0.7,
+          10, 0.85,
+          14, 0.75,
+          16, 0.6,
         ],
       },
     });
@@ -116,6 +127,10 @@ export default function HeatmapLayer({
       if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
     };
   }, [map, data]);
+
+  if (loading && !data) {
+    return null;
+  }
 
   return null;
 }
