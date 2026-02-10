@@ -53,10 +53,10 @@ class ChoroplethResponse(BaseModel):
 class HeatmapPoint(BaseModel):
     """Single weighted point for a heatmap layer."""
 
-    lat: Decimal
-    lon: Decimal
-    weight: Decimal = Field(
-        default=Decimal("1"),
+    lat: float
+    lon: float
+    weight: float = Field(
+        default=1.0,
         description="Weight / intensity at this point",
     )
 
