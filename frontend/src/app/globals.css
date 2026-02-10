@@ -71,15 +71,25 @@ body {
   transition-timing-function: ease;
 }
 
-/* MapLibre overrides */
+/* MapLibre overrides — dark theme */
 .maplibregl-ctrl-group {
   border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-  border: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
 }
 
 .maplibregl-ctrl-group button {
   border-radius: 0 !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.2) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #e2e8f0 !important;
 }
 
 .maplibregl-ctrl-group button:first-child {
@@ -88,4 +98,97 @@ body {
 
 .maplibregl-ctrl-group button:last-child {
   border-radius: 0 0 12px 12px !important;
+  border-bottom: none !important;
+}
+
+.maplibregl-ctrl-group button svg {
+  fill: currentColor !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(8px) !important;
+  border-radius: 8px !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: #818cf8 !important;
+}
+
+/* ── Barrio popup tooltip — dark glass ── */
+.barrio-popup .maplibregl-popup-content {
+  background: rgba(15, 23, 42, 0.92) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  color: #e2e8f0 !important;
+  min-width: 180px;
+}
+
+.barrio-popup .maplibregl-popup-tip {
+  border-top-color: rgba(15, 23, 42, 0.92) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.92) !important;
+}
+
+.barrio-tooltip {
+  padding: 12px 14px;
+}
+
+.barrio-tooltip-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.barrio-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.barrio-tooltip-label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.barrio-tooltip-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #34d399;
+  font-variant-numeric: tabular-nums;
+}
+
+.barrio-tooltip-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4b5fd;
+  font-variant-numeric: tabular-nums;
+}
+
+.barrio-tooltip-hint {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 116, 139, 0.15);
+  text-align: center;
+}
+
+/* Animate-in for panels */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-in {
+  animation: slide-in 0.2s ease-out;
 }

@@ -415,6 +415,128 @@ async def simulate_roi(params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ── Opportunities ─────────────────────────────────────────────────────
+
+async def get_opportunities(
+    db: AsyncSession,
+    operation_type: str = "sale",
+    threshold: float = 0.8,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Find listings priced below the barrio median by *threshold*.
+
+    E.g. threshold=0.8 means 20% below median.
+    """
+    # Latest snapshot per barrio
+    latest_sub = (
+        select(
+            BarrioSnapshot.barrio_id,
+            func.max(BarrioSnapshot.snapshot_date).label("max_date"),
+        )
+        .where(BarrioSnapshot.operation_type == operation_type)
+        .group_by(BarrioSnapshot.barrio_id)
+        .subquery()
+    )
+
+    snap = (
+        select(
+            BarrioSnapshot.barrio_id,
+            BarrioSnapshot.median_price_usd_m2,
+        )
+        .join(
+            latest_sub,
+            (BarrioSnapshot.barrio_id == latest_sub.c.barrio_id)
+            & (BarrioSnapshot.snapshot_date == latest_sub.c.max_date),
+        )
+        .where(
+            BarrioSnapshot.operation_type == operation_type,
+            BarrioSnapshot.median_price_usd_m2.isnot(None),
+            BarrioSnapshot.median_price_usd_m2 > 0,
+        )
+        .subquery()
+    )
+
+    # Compute listing price/m2
+    listing_price_m2 = (
+        cast(Listing.price_usd_blue, Float) / cast(Listing.surface_total_m2, Float)
+    )
+
+    stmt = (
+        select(
+            Listing.id,
+            Listing.title,
+            Listing.property_type,
+            Listing.operation_type,
+            Listing.price_usd_blue,
+            Listing.surface_total_m2,
+            listing_price_m2.label("price_usd_m2"),
+            Listing.rooms,
+            Listing.bedrooms,
+            Listing.url,
+            Barrio.name.label("barrio_name"),
+            Barrio.slug.label("barrio_slug"),
+            snap.c.median_price_usd_m2.label("median_price_usd_m2"),
+        )
+        .join(Barrio, Listing.barrio_id == Barrio.id)
+        .join(snap, Listing.barrio_id == snap.c.barrio_id)
+        .where(
+            Listing.is_active.is_(True),
+            Listing.operation_type == operation_type,
+            Listing.price_usd_blue.isnot(None),
+            Listing.price_usd_blue > 0,
+            Listing.surface_total_m2.isnot(None),
+            Listing.surface_total_m2 > 0,
+            listing_price_m2 < snap.c.median_price_usd_m2 * threshold,
+        )
+        .order_by(
+            (listing_price_m2 / snap.c.median_price_usd_m2).asc()
+        )
+        .limit(limit)
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    items: list[dict[str, Any]] = []
+    discount_sum = 0.0
+    barrio_counts: dict[str, int] = {}
+
+    for row in rows:
+        price_m2 = float(row.price_usd_m2)
+        median = float(row.median_price_usd_m2)
+        discount_pct = round((1 - price_m2 / median) * 100, 1)
+        discount_sum += discount_pct
+
+        barrio_counts[row.barrio_name] = barrio_counts.get(row.barrio_name, 0) + 1
+
+        items.append({
+            "id": str(row.id),
+            "title": row.title,
+            "property_type": row.property_type,
+            "operation_type": row.operation_type,
+            "price_usd_blue": float(row.price_usd_blue) if row.price_usd_blue else None,
+            "surface_total_m2": float(row.surface_total_m2) if row.surface_total_m2 else None,
+            "price_usd_m2": round(price_m2, 2),
+            "rooms": row.rooms,
+            "bedrooms": row.bedrooms,
+            "barrio_name": row.barrio_name,
+            "barrio_slug": row.barrio_slug,
+            "median_price_usd_m2": round(median, 2),
+            "discount_pct": discount_pct,
+            "url": row.url,
+        })
+
+    avg_discount = round(discount_sum / len(items), 1) if items else None
+    top_barrio = max(barrio_counts, key=barrio_counts.get) if barrio_counts else None
+
+    return {
+        "items": items,
+        "total": len(items),
+        "avg_discount_pct": avg_discount,
+        "top_barrio": top_barrio,
+    }
+
+
 # ── IRR / NPV helpers ────────────────────────────────────────────────
 
 def _compute_npv(rate: float, cash_flows: list[float]) -> float:

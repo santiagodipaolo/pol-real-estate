@@ -99,18 +99,36 @@ export async function simulateROI(data: ROISimulationRequest) {
 }
 
 // Map
-export async function getChoropleth(metric?: string, operationType?: string) {
+export async function getChoropleth(metric?: string, operationType?: string, propertyType?: string) {
   const params = new URLSearchParams();
   if (metric) params.set("metric", metric);
   if (operationType) params.set("operation_type", operationType);
+  if (propertyType) params.set("property_type", propertyType);
   return fetchAPI<GeoJSONFeatureCollection>(`/map/choropleth?${params}`);
 }
 
-export async function getHeatmapData(operationType?: string, bbox?: string) {
+export async function getHeatmapData(operationType?: string, bbox?: string, propertyType?: string) {
   const params = new URLSearchParams();
   if (operationType) params.set("operation_type", operationType);
   if (bbox) params.set("bbox", bbox);
+  if (propertyType) params.set("property_type", propertyType);
   return fetchAPI<HeatmapResponse>(`/map/heatmap?${params}`);
+}
+
+// Comparador
+export async function compareBarrios(slugs: string[]) {
+  const params = new URLSearchParams();
+  slugs.forEach((s) => params.append("slugs[]", s));
+  return fetchAPI<BarrioComparison>(`/barrios/compare?${params}`);
+}
+
+// Opportunities
+export async function getOpportunities(operationType?: string, threshold?: number, limit?: number) {
+  const params = new URLSearchParams();
+  if (operationType) params.set("operation_type", operationType);
+  if (threshold != null) params.set("threshold", String(threshold));
+  if (limit != null) params.set("limit", String(limit));
+  return fetchAPI<OpportunitiesResponse>(`/analytics/opportunities?${params}`);
 }
 
 // Types
@@ -296,4 +314,50 @@ export interface HeatmapResponse {
   points: { lat: number; lon: number; weight: number }[];
   metric: string | null;
   total: number;
+}
+
+// Comparador
+export interface BarrioComparisonItem {
+  barrio_id: number;
+  barrio_name: string;
+  slug: string;
+  comuna_id: number;
+  listing_count: number | null;
+  median_price_usd_m2: number | null;
+  avg_price_usd_m2: number | null;
+  p25_price_usd_m2: number | null;
+  p75_price_usd_m2: number | null;
+  avg_days_on_market: number | null;
+  rental_yield_estimate: number | null;
+  trends: SnapshotSummary[];
+}
+
+export interface BarrioComparison {
+  barrios: BarrioComparisonItem[];
+  generated_at: string | null;
+}
+
+// Opportunities
+export interface OpportunityItem {
+  id: string;
+  title: string | null;
+  property_type: string;
+  operation_type: string;
+  price_usd_blue: number | null;
+  surface_total_m2: number | null;
+  price_usd_m2: number | null;
+  rooms: number | null;
+  bedrooms: number | null;
+  barrio_name: string;
+  barrio_slug: string;
+  median_price_usd_m2: number;
+  discount_pct: number;
+  url: string | null;
+}
+
+export interface OpportunitiesResponse {
+  items: OpportunityItem[];
+  total: number;
+  avg_discount_pct: number | null;
+  top_barrio: string | null;
 }

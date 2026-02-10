@@ -14,18 +14,20 @@ router = APIRouter()
 async def choropleth(
     metric: str = Query("median_price_usd_m2", description="Metric to visualize"),
     operation_type: str = Query("sale"),
+    property_type: Optional[str] = Query(None, description="Filter by property type"),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_choropleth_data(db, metric, operation_type)
+    return await get_choropleth_data(db, metric, operation_type, property_type)
 
 
 @router.get("/heatmap", response_model=HeatmapResponse)
 async def heatmap(
     operation_type: str = Query("sale"),
     bbox: Optional[str] = Query(None, description="west,south,east,north"),
+    property_type: Optional[str] = Query(None, description="Filter by property type"),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_heatmap_data(db, operation_type, bbox)
+    return await get_heatmap_data(db, operation_type, bbox, property_type)
 
 
 @router.get("/clusters", response_model=ClusterResponse)

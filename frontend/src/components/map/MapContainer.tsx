@@ -12,14 +12,22 @@ interface MapContainerProps {
   children?: React.ReactNode;
 }
 
-const BUENOS_AIRES_CENTER: [number, number] = [-58.4370, -34.6083];
+// CABA centroid
+const CABA_CENTER: [number, number] = [-58.4450, -34.6140];
+
+// Strict CABA bounding box with minimal padding
+const CABA_BOUNDS: [[number, number], [number, number]] = [
+  [-58.54, -34.71], // SW
+  [-58.33, -34.53], // NE
+];
+
 const STYLE_URL =
   process.env.NEXT_PUBLIC_MAPLIBRE_STYLE ||
-  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 export default function MapContainer({
   className = "w-full h-full",
-  center = BUENOS_AIRES_CENTER,
+  center = CABA_CENTER,
   zoom = 12,
   onMapReady,
   children,
@@ -36,15 +44,15 @@ export default function MapContainer({
       style: STYLE_URL,
       center,
       zoom,
-      minZoom: 10,
+      minZoom: 11,
       maxZoom: 18,
-      maxBounds: [
-        [-58.65, -34.80],
-        [-58.25, -34.50],
-      ],
+      maxBounds: CABA_BOUNDS,
+      attributionControl: false,
+      fadeDuration: 100,
     });
 
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
 
     map.on("load", () => {
       setIsReady(true);
@@ -62,10 +70,13 @@ export default function MapContainer({
 
   return (
     <div className={`relative ${className}`}>
-      <div ref={containerRef} className="w-full h-full rounded-lg" />
+      <div ref={containerRef} className="w-full h-full rounded-2xl" />
       {!isReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 rounded-lg">
-          <p className="text-slate-400 animate-pulse">Cargando mapa...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 rounded-2xl">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-400 text-sm">Cargando mapa...</p>
+          </div>
         </div>
       )}
       {children}

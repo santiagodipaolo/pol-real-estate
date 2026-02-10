@@ -21,6 +21,7 @@ async def get_choropleth_data(
     db: AsyncSession,
     metric: str = "median_price_usd_m2",
     operation_type: str = "venta",
+    property_type: str | None = None,
 ) -> dict[str, Any]:
     """Build a GeoJSON FeatureCollection where each Feature is a barrio
     polygon, coloured by the latest snapshot *metric* value."""
@@ -39,15 +40,23 @@ async def get_choropleth_data(
     metric_col = getattr(BarrioSnapshot, metric)
 
     # Latest snapshot per barrio for the given operation_type
-    latest_sub = (
+    latest_sub_q = (
         select(
             BarrioSnapshot.barrio_id,
             func.max(BarrioSnapshot.snapshot_date).label("max_date"),
         )
         .where(BarrioSnapshot.operation_type == operation_type)
-        .group_by(BarrioSnapshot.barrio_id)
-        .subquery()
     )
+    if property_type:
+        latest_sub_q = latest_sub_q.where(BarrioSnapshot.property_type == property_type)
+    latest_sub = latest_sub_q.group_by(BarrioSnapshot.barrio_id).subquery()
+
+    snapshot_join_cond = (
+        (Barrio.id == BarrioSnapshot.barrio_id)
+        & (BarrioSnapshot.operation_type == operation_type)
+    )
+    if property_type:
+        snapshot_join_cond = snapshot_join_cond & (BarrioSnapshot.property_type == property_type)
 
     stmt = (
         select(
@@ -63,8 +72,7 @@ async def get_choropleth_data(
         )
         .outerjoin(
             BarrioSnapshot,
-            (Barrio.id == BarrioSnapshot.barrio_id)
-            & (BarrioSnapshot.operation_type == operation_type),
+            snapshot_join_cond,
         )
         .outerjoin(
             latest_sub,
@@ -125,16 +133,17 @@ async def get_heatmap_data(
     db: AsyncSession,
     operation_type: str = "sale",
     bbox: tuple[float, float, float, float] | None = None,
+    property_type: str | None = None,
 ) -> dict[str, Any]:
     """Return dense heatmap points filling each barrio polygon."""
 
     # Try listing-level data first
-    listing_points = await _heatmap_from_listings(db, operation_type, bbox)
+    listing_points = await _heatmap_from_listings(db, operation_type, bbox, property_type)
     if listing_points:
         return {"points": listing_points, "metric": "price_usd_m2", "total": len(listing_points)}
 
     # Fallback: fill barrio polygons with points
-    polygon_points = await _heatmap_from_polygons(db, operation_type)
+    polygon_points = await _heatmap_from_polygons(db, operation_type, property_type)
     return {"points": polygon_points, "metric": "median_price_usd_m2", "total": len(polygon_points)}
 
 
@@ -142,6 +151,7 @@ async def _heatmap_from_listings(
     db: AsyncSession,
     operation_type: str,
     bbox: tuple[float, float, float, float] | None,
+    property_type: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build heatmap points from individual listings."""
     stmt = (
@@ -158,6 +168,9 @@ async def _heatmap_from_listings(
             Listing.operation_type == operation_type,
         )
     )
+
+    if property_type:
+        stmt = stmt.where(Listing.property_type == property_type)
 
     if bbox is not None:
         min_lon, min_lat, max_lon, max_lat = bbox
@@ -195,17 +208,27 @@ async def _heatmap_from_listings(
 async def _heatmap_from_polygons(
     db: AsyncSession,
     operation_type: str,
+    property_type: str | None = None,
 ) -> list[dict[str, Any]]:
     """Fill each barrio polygon with a dense grid of points weighted by price."""
-    latest_sub = (
+    latest_sub_q = (
         select(
             BarrioSnapshot.barrio_id,
             func.max(BarrioSnapshot.snapshot_date).label("max_date"),
         )
         .where(BarrioSnapshot.operation_type == operation_type)
-        .group_by(BarrioSnapshot.barrio_id)
-        .subquery()
     )
+    if property_type:
+        latest_sub_q = latest_sub_q.where(BarrioSnapshot.property_type == property_type)
+    latest_sub = latest_sub_q.group_by(BarrioSnapshot.barrio_id).subquery()
+
+    snapshot_cond = [
+        Barrio.geometry.isnot(None),
+        BarrioSnapshot.operation_type == operation_type,
+        BarrioSnapshot.median_price_usd_m2.isnot(None),
+    ]
+    if property_type:
+        snapshot_cond.append(BarrioSnapshot.property_type == property_type)
 
     stmt = (
         select(
@@ -221,11 +244,7 @@ async def _heatmap_from_polygons(
             (BarrioSnapshot.barrio_id == latest_sub.c.barrio_id)
             & (BarrioSnapshot.snapshot_date == latest_sub.c.max_date),
         )
-        .where(
-            Barrio.geometry.isnot(None),
-            BarrioSnapshot.operation_type == operation_type,
-            BarrioSnapshot.median_price_usd_m2.isnot(None),
-        )
+        .where(*snapshot_cond)
     )
 
     result = await db.execute(stmt)
@@ -347,22 +366,36 @@ def _normalize_weights(
     points: list[dict[str, Any]],
     price_values: list[float],
 ) -> list[dict[str, Any]]:
-    """Normalize price_m2 values into 0.1-1.0 weights."""
-    if price_values:
-        max_val = max(price_values)
-        min_val = min(price_values)
-        val_range = max_val - min_val if max_val != min_val else 1.0
+    """Normalize price_m2 values into 0.15-1.0 weights using quantile ranking.
+
+    Quantile-based normalization guarantees a spread of weights across the
+    full range even when the underlying prices have low variance.
+    """
+    if not price_values:
+        return [
+            {"lat": p["lat"], "lon": p["lon"], "weight": 0.5}
+            for p in points
+        ]
+
+    # Build a sorted list of unique prices and map each to its rank percentile
+    sorted_unique = sorted(set(price_values))
+    n = len(sorted_unique)
+    if n == 1:
+        # Single unique value — everything gets mid-weight
+        rank_map = {sorted_unique[0]: 0.55}
     else:
-        min_val = 0.0
-        val_range = 1.0
+        rank_map = {
+            val: i / (n - 1) for i, val in enumerate(sorted_unique)
+        }
 
     output: list[dict[str, Any]] = []
     for p in points:
-        weight = 0.5
         if p["price_m2"] is not None:
-            # Map to 0.15-1.0 range so even cheap areas are visible
-            raw = (p["price_m2"] - min_val) / val_range
+            # Map rank (0-1) to weight range 0.15-1.0
+            raw = rank_map.get(p["price_m2"], 0.5)
             weight = 0.15 + raw * 0.85
+        else:
+            weight = 0.5
         output.append({
             "lat": p["lat"],
             "lon": p["lon"],

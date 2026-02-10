@@ -31,6 +31,15 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/comparador",
+    label: "Comparador",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+      </svg>
+    ),
+  },
   { type: "divider" as const, href: "", label: "", icon: null },
   {
     section: "Analytics",
@@ -70,11 +79,29 @@ const navItems = [
     ),
   },
   {
+    href: "/analytics/uva-calculator",
+    label: "Calc UVA",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75V18m15-8.25v.75a.75.75 0 0 1-.75.75H1.5a.75.75 0 0 1-.75-.75v-.75m20.25 0V6.375c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v3.375m20.25 0h-20.25" />
+      </svg>
+    ),
+  },
+  {
     href: "/analytics/market-pulse",
     label: "Market Pulse",
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/analytics/oportunidades",
+    label: "Oportunidades",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
       </svg>
     ),
   },

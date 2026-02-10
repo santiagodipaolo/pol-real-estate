@@ -11,6 +11,7 @@ from app.schemas.analytics import (
     PriceDistribution,
     ROISimulationRequest,
     ROISimulationResult,
+    OpportunitiesResponse,
 )
 from app.services.analytics_service import (
     get_price_trends,
@@ -18,6 +19,7 @@ from app.services.analytics_service import (
     get_market_pulse,
     get_price_distribution,
     simulate_roi,
+    get_opportunities,
 )
 
 router = APIRouter()
@@ -50,6 +52,16 @@ async def price_distribution(
     db: AsyncSession = Depends(get_db),
 ):
     return await get_price_distribution(db, barrio_id, bins)
+
+
+@router.get("/opportunities", response_model=OpportunitiesResponse)
+async def opportunities(
+    operation_type: str = Query("sale"),
+    threshold: float = Query(0.8, ge=0.5, le=0.99, description="Price threshold as fraction of median"),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_opportunities(db, operation_type, threshold, limit)
 
 
 @router.post("/roi-simulation")

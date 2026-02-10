@@ -142,6 +142,38 @@ class ROISimulationRequest(BaseModel):
     )
 
 
+# ---------------------------------------------------------------------------
+# Opportunities
+# ---------------------------------------------------------------------------
+
+class OpportunityItem(BaseModel):
+    """A listing priced below the barrio median."""
+
+    id: str
+    title: Optional[str] = None
+    property_type: str
+    operation_type: str
+    price_usd_blue: Optional[Decimal] = None
+    surface_total_m2: Optional[Decimal] = None
+    price_usd_m2: Optional[Decimal] = None
+    rooms: Optional[int] = None
+    bedrooms: Optional[int] = None
+    barrio_name: str
+    barrio_slug: str
+    median_price_usd_m2: Decimal
+    discount_pct: Decimal = Field(description="Percentage below median (e.g. 23.5)")
+    url: Optional[str] = None
+
+
+class OpportunitiesResponse(BaseModel):
+    """Response for the opportunities endpoint."""
+
+    items: list[OpportunityItem]
+    total: int
+    avg_discount_pct: Optional[Decimal] = None
+    top_barrio: Optional[str] = None
+
+
 class ROISimulationResult(BaseModel):
     """Output of a buy-to-rent ROI simulation."""
 
