@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMobileSidebar } from "./MobileSidebarProvider";
 
 const navItems = [
   {
@@ -109,74 +110,94 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { isOpen, close } = useMobileSidebar();
 
   return (
-    <aside className="w-[240px] min-w-[240px] bg-[#0f172a] text-white min-h-screen flex flex-col border-r border-slate-800/50">
-      {/* Logo */}
-      <div className="p-5 pb-4">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-sm">
-            P
-          </div>
-          <div>
-            <span className="text-[15px] font-semibold tracking-tight">POL Real Estate</span>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Buenos Aires</p>
-          </div>
-        </Link>
-      </div>
+    <>
+      {/* Backdrop overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={close}
+        />
+      )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-0.5">
-        {navItems.map((item, idx) => {
-          if ("type" in item && item.type === "divider") {
-            return <div key={idx} className="my-3 border-t border-slate-800/50" />;
-          }
+      <aside
+        className={`
+          w-[240px] min-w-[240px] bg-[#0f172a] text-white flex flex-col border-r border-slate-800/50
+          fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          md:static md:translate-x-0
+        `}
+      >
+        {/* Logo */}
+        <div className="p-5 pb-4">
+          <Link href="/dashboard" className="flex items-center gap-3" onClick={close}>
+            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-sm">
+              P
+            </div>
+            <div>
+              <span className="text-[15px] font-semibold tracking-tight">POL Real Estate</span>
+              <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Buenos Aires</p>
+            </div>
+          </Link>
+        </div>
 
-          if ("section" in item) {
+        {/* Navigation */}
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+          {navItems.map((item, idx) => {
+            if ("type" in item && item.type === "divider") {
+              return <div key={idx} className="my-3 border-t border-slate-800/50" />;
+            }
+
+            if ("section" in item) {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+              return (
+                <div key={item.href}>
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 pt-3 pb-1.5">Analytics</p>
+                  <Link
+                    href={item.href}
+                    onClick={close}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                      isActive
+                        ? "bg-indigo-500/15 text-indigo-400"
+                        : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                    }`}
+                  >
+                    <span className={isActive ? "text-indigo-400" : "text-slate-500"}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                </div>
+              );
+            }
+
             const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
             return (
-              <div key={item.href}>
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 pt-3 pb-1.5">Analytics</p>
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                    isActive
-                      ? "bg-indigo-500/15 text-indigo-400"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                  }`}
-                >
-                  <span className={isActive ? "text-indigo-400" : "text-slate-500"}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={close}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                  isActive
+                    ? "bg-indigo-500/15 text-indigo-400"
+                    : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                }`}
+              >
+                <span className={isActive ? "text-indigo-400" : "text-slate-500"}>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
             );
-          }
+          })}
+        </nav>
 
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                isActive
-                  ? "bg-indigo-500/15 text-indigo-400"
-                  : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-              }`}
-            >
-              <span className={isActive ? "text-indigo-400" : "text-slate-500"}>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-slate-800/50">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span className="text-[11px] text-slate-600 font-medium">v0.1 Beta</span>
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-800/50">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[11px] text-slate-600 font-medium">v0.1 Beta</span>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

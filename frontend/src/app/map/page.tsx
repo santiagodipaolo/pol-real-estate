@@ -55,10 +55,10 @@ export default function MapPage() {
     : "";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem-3rem)]">
+    <div className="flex flex-col h-[calc(100dvh-3.5rem-2rem)] md:h-[calc(100dvh-3.5rem-3rem)]">
       {/* Controls Bar */}
-      <div className="flex items-center justify-between pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between pb-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
           <div className="flex items-center bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-700/50 p-0.5">
             <button
@@ -169,7 +169,7 @@ export default function MapPage() {
 
         {/* Selected Barrio Detail Panel */}
         {selectedBarrio && viewMode === "choropleth" && (
-          <div className="absolute top-4 right-4 bg-slate-900/85 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-700/50 p-4 w-[280px] z-10 animate-in">
+          <div className="absolute top-4 left-4 right-4 md:left-auto md:right-4 bg-slate-900/85 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-700/50 p-4 md:w-[280px] z-10 animate-in">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-white text-sm truncate pr-2">
                 {selectedName}

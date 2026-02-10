@@ -33,6 +33,23 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+
+body.sidebar-open {
+  overflow: hidden;
+}
+
+/* Touch-device optimizations */
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+  }
+
+  a, button {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* Scrollbar */

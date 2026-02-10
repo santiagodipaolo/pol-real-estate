@@ -55,9 +55,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Resumen del mercado inmobiliario de CABA</p>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
               </svg>
             </Link>
           </div>
-          <div className="h-[480px] rounded-xl overflow-hidden">
+          <div className="h-[300px] md:h-[400px] lg:h-[480px] rounded-xl overflow-hidden">
             <MapContainer onMapReady={handleMapReady}>
               <ChoroplethLayer
                 map={map}

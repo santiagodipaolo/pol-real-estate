@@ -32,7 +32,8 @@ export default function PriceTrendChart({ data, title }: PriceTrendChartProps) {
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={350}>
+      <div className="h-[250px] md:h-[350px]">
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis
@@ -78,6 +79,7 @@ export default function PriceTrendChart({ data, title }: PriceTrendChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

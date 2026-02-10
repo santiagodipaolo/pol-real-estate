@@ -52,8 +52,8 @@ export default function CurrencyTicker() {
 
   if (!rates) {
     return (
-      <div className="flex items-center gap-3">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="flex items-center gap-1.5 md:gap-3">
+        {[1, 2].map((i) => (
           <div key={i} className="h-7 w-24 bg-slate-100 rounded-lg animate-pulse" />
         ))}
       </div>
@@ -68,13 +68,14 @@ export default function CurrencyTicker() {
   ];
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 md:gap-2">
       {items.map((item) => {
         const rate = rates[item.key];
+        const hiddenOnMobile = item.key === "oficial" || item.key === "ccl";
         return (
           <div
             key={item.label}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${item.color}`}
+            className={`${hiddenOnMobile ? "hidden sm:flex" : "flex"} items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${item.color}`}
           >
             <span className="opacity-70">{item.label}</span>
             {rate ? (

@@ -172,7 +172,7 @@ export default function UvaCalculatorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6 space-y-4">
             <h2 className="text-sm font-semibold text-slate-900">Par&aacute;metros del Cr&eacute;dito</h2>
 
             <div>
@@ -309,11 +309,12 @@ export default function UvaCalculatorPage() {
 
               {/* Chart */}
               {chartData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-100 p-5">
+                <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5">
                   <h3 className="text-sm font-semibold text-slate-900 mb-4">
                     Proyecci&oacute;n de Cuota Mensual (ARS)
                   </h3>
-                  <ResponsiveContainer width="100%" height={320}>
+                  <div className="h-[250px] md:h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData}>
                       <defs>
                         <linearGradient id="cuotaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -356,6 +357,7 @@ export default function UvaCalculatorPage() {
                       />
                     </AreaChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
               )}
             </>

@@ -93,13 +93,13 @@ export default function GlobalFilters({
             type="number"
             placeholder="Precio min"
             onChange={(e) => update("priceMin", Number(e.target.value))}
-            className={`w-28 ${selectClass}`}
+            className={`w-full sm:w-28 ${selectClass}`}
           />
           <input
             type="number"
             placeholder="Precio max"
             onChange={(e) => update("priceMax", Number(e.target.value))}
-            className={`w-28 ${selectClass}`}
+            className={`w-full sm:w-28 ${selectClass}`}
           />
         </>
       )}

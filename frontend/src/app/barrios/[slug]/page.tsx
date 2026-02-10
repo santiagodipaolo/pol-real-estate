@@ -140,12 +140,12 @@ export default function BarrioDetailPage({
 
       {/* Chart + Map */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
           <PriceTrendChart data={trends} title="Tendencia Precio/m2" />
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
           <h3 className="text-sm font-semibold text-slate-900 mb-3">Ubicacion</h3>
-          <div className="h-[350px] rounded-xl overflow-hidden">
+          <div className="h-[250px] md:h-[350px] rounded-xl overflow-hidden">
             <MapContainer
               onMapReady={handleMapReady}
               center={

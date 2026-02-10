@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import useIsMobile from "@/lib/hooks/useIsMobile";
 
 interface BarrioBarChartProps {
   data: { name: string; value: number | null; slug?: string }[];
@@ -25,6 +26,10 @@ export default function BarrioBarChart({
   valuePrefix = "$",
   valueSuffix = "/m2",
 }: BarrioBarChartProps) {
+  const isMobile = useIsMobile();
+  const marginLeft = isMobile ? 50 : 80;
+  const yAxisWidth = isMobile ? 50 : 80;
+
   const filtered = data
     .filter((d) => d.value !== null)
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
@@ -45,8 +50,9 @@ export default function BarrioBarChart({
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
         </div>
       )}
-      <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={filtered} layout="vertical" margin={{ left: 80, right: 10 }}>
+      <div className="h-[300px] md:h-[400px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={filtered} layout="vertical" margin={{ left: marginLeft, right: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
           <XAxis
             type="number"
@@ -59,7 +65,7 @@ export default function BarrioBarChart({
             type="category"
             dataKey="name"
             tick={{ fontSize: 11, fill: "#475569" }}
-            width={80}
+            width={yAxisWidth}
             axisLine={false}
             tickLine={false}
           />
@@ -81,6 +87,7 @@ export default function BarrioBarChart({
           <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} barSize={16} />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

@@ -37,7 +37,7 @@ export default function MetricCard({
         : `${prefix}${value}${suffix}`;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-5 card-hover">
+    <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 card-hover">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-[13px] text-slate-500 font-medium truncate">{title}</p>

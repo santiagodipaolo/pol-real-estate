@@ -196,7 +196,7 @@ export default function CurrencyPage() {
       </div>
 
       {/* Chart */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">
           Historial - Dolar {rateTypes.find((r) => r.value === rateType)?.label}
         </h2>
@@ -213,7 +213,8 @@ export default function CurrencyPage() {
             Sin datos disponibles para el periodo seleccionado
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={400}>
+          <div className="h-[300px] md:h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis
@@ -273,11 +274,12 @@ export default function CurrencyPage() {
               />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         )}
       </div>
 
       {/* Brecha Calculator */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
         <h2 className="text-sm font-semibold text-slate-900 mb-1">Calculadora de Brecha Cambiaria</h2>
         <p className="text-xs text-slate-500 mb-5">
           La brecha se calcula como: (Blue Venta - Oficial Venta) / Oficial Venta x 100

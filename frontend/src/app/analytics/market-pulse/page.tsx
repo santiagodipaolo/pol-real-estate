@@ -154,7 +154,7 @@ export default function MarketPulsePage() {
       </div>
 
       {/* Absorption Rate */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">
@@ -210,7 +210,7 @@ export default function MarketPulsePage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
           <BarrioBarChart
             data={listingsByBarrio}
             title="Top 15 Barrios por Cantidad de Listings"
@@ -219,7 +219,7 @@ export default function MarketPulsePage() {
             valueSuffix=" listings"
           />
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
           <BarrioBarChart
             data={priceByBarrio}
             title="Top 15 Barrios por Precio USD/m2"

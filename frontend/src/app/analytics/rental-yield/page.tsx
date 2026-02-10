@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import MetricCard from "@/components/ui/MetricCard";
+import useIsMobile from "@/lib/hooks/useIsMobile";
 import { getRentalYield, type RentalYieldBarrio } from "@/lib/api";
 
 type SortKey = "gross_rental_yield" | "net_rental_yield" | "median_sale_price_usd_m2" | "median_rent_usd_m2";
@@ -24,6 +25,7 @@ export default function RentalYieldPage() {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("gross_rental_yield");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setLoading(true);
@@ -151,12 +153,13 @@ export default function RentalYieldPage() {
       )}
 
       {/* Bar Chart */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6">
         <h2 className="text-sm font-semibold text-slate-900 mb-4">
           Top 20 Barrios por Rentabilidad Bruta
         </h2>
-        <ResponsiveContainer width="100%" height={500}>
-          <BarChart data={chartData} layout="vertical" margin={{ left: 100, right: 10 }}>
+        <div className="h-[350px] md:h-[500px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 60 : 100, right: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
             <XAxis
               type="number"
@@ -170,7 +173,7 @@ export default function RentalYieldPage() {
               type="category"
               dataKey="name"
               tick={{ fontSize: 11, fill: "#475569" }}
-              width={100}
+              width={isMobile ? 60 : 100}
               axisLine={false}
               tickLine={false}
             />
@@ -199,6 +202,7 @@ export default function RentalYieldPage() {
             <Bar dataKey="net" name="Neto" fill="#cbd5e1" radius={[0, 6, 6, 0]} barSize={14} />
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Table */}

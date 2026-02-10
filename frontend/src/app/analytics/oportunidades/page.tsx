@@ -31,7 +31,7 @@ export default function OportunidadesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-wrap items-center gap-5">
+      <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 flex flex-wrap items-center gap-5">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Operaci&oacute;n</label>
           <select
@@ -169,7 +169,7 @@ export default function OportunidadesPage() {
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-medium transition-colors"
+                  className="flex items-center justify-center gap-1.5 w-full px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-medium transition-colors"
                 >
                   Ver publicaci&oacute;n
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

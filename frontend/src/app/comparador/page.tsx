@@ -202,7 +202,8 @@ export default function ComparadorPage() {
         <>
           {/* Metrics Table */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -262,6 +263,7 @@ export default function ComparadorPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Trend Chart */}
@@ -270,7 +272,8 @@ export default function ComparadorPage() {
               <h3 className="text-sm font-semibold text-slate-900 mb-4">
                 Tendencia Precio Mediana USD/m\u00b2
               </h3>
-              <ResponsiveContainer width="100%" height={320}>
+              <div className="h-[250px] md:h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData}>
                   <XAxis
                     dataKey="date"
@@ -305,6 +308,7 @@ export default function ComparadorPage() {
                   ))}
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
           )}
         </>
