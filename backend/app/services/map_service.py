@@ -120,10 +120,28 @@ async def get_choropleth_data(
 
 async def get_heatmap_data(
     db: AsyncSession,
-    operation_type: str = "venta",
+    operation_type: str = "sale",
     bbox: tuple[float, float, float, float] | None = None,
+) -> dict[str, Any]:
+    """Return heatmap points. Tries listing-level data first, falls back
+    to barrio centroid data from snapshots."""
+
+    # --- Try listing-level data first ---
+    listing_points = await _heatmap_from_listings(db, operation_type, bbox)
+    if listing_points:
+        return {"points": listing_points, "metric": "price_usd_m2", "total": len(listing_points)}
+
+    # --- Fallback: barrio centroid data from snapshots ---
+    centroid_points = await _heatmap_from_snapshots(db, operation_type)
+    return {"points": centroid_points, "metric": "median_price_usd_m2", "total": len(centroid_points)}
+
+
+async def _heatmap_from_listings(
+    db: AsyncSession,
+    operation_type: str,
+    bbox: tuple[float, float, float, float] | None,
 ) -> list[dict[str, Any]]:
-    """Return a list of ``{lat, lon, weight}`` points for heatmap rendering."""
+    """Build heatmap points from individual listings."""
     stmt = (
         select(
             Listing.latitude,
@@ -169,9 +187,79 @@ async def get_heatmap_data(
         if price_m2 is not None:
             price_m2_values.append(price_m2)
 
-    if price_m2_values:
-        max_val = max(price_m2_values)
-        min_val = min(price_m2_values)
+    return _normalize_weights(points, price_m2_values)
+
+
+async def _heatmap_from_snapshots(
+    db: AsyncSession,
+    operation_type: str,
+) -> list[dict[str, Any]]:
+    """Build heatmap points from barrio centroids + snapshot median price."""
+    latest_sub = (
+        select(
+            BarrioSnapshot.barrio_id,
+            func.max(BarrioSnapshot.snapshot_date).label("max_date"),
+        )
+        .where(BarrioSnapshot.operation_type == operation_type)
+        .group_by(BarrioSnapshot.barrio_id)
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Barrio.centroid_lat,
+            Barrio.centroid_lon,
+            BarrioSnapshot.median_price_usd_m2,
+            BarrioSnapshot.listing_count,
+        )
+        .join(BarrioSnapshot, Barrio.id == BarrioSnapshot.barrio_id)
+        .join(
+            latest_sub,
+            (BarrioSnapshot.barrio_id == latest_sub.c.barrio_id)
+            & (BarrioSnapshot.snapshot_date == latest_sub.c.max_date),
+        )
+        .where(
+            Barrio.centroid_lat.isnot(None),
+            Barrio.centroid_lon.isnot(None),
+            BarrioSnapshot.operation_type == operation_type,
+            BarrioSnapshot.median_price_usd_m2.isnot(None),
+        )
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    if not rows:
+        return []
+
+    points: list[dict[str, Any]] = []
+    price_values: list[float] = []
+
+    for row in rows:
+        price = float(row.median_price_usd_m2)
+        count = int(row.listing_count) if row.listing_count else 1
+        # Create multiple points per barrio proportional to listing count
+        # to make more active barrios appear more intense
+        num_points = max(1, min(count // 5, 20))
+        for _ in range(num_points):
+            points.append({
+                "lat": float(row.centroid_lat),
+                "lon": float(row.centroid_lon),
+                "price_m2": price,
+            })
+        price_values.append(price)
+
+    return _normalize_weights(points, price_values)
+
+
+def _normalize_weights(
+    points: list[dict[str, Any]],
+    price_values: list[float],
+) -> list[dict[str, Any]]:
+    """Normalize price_m2 values into 0-1 weights."""
+    if price_values:
+        max_val = max(price_values)
+        min_val = min(price_values)
         val_range = max_val - min_val if max_val != min_val else 1.0
     else:
         min_val = 0.0
