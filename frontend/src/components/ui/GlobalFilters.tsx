@@ -36,6 +36,9 @@ const currencies = [
   { value: "usd_mep", label: "USD MEP" },
 ];
 
+const selectClass =
+  "px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400";
+
 export default function GlobalFilters({
   onFilterChange,
   showPriceRange = false,
@@ -53,40 +56,34 @@ export default function GlobalFilters({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       <select
         value={filters.operationType}
         onChange={(e) => update("operationType", e.target.value)}
-        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={selectClass}
       >
         {operationTypes.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
+          <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
 
       <select
         value={filters.propertyType}
         onChange={(e) => update("propertyType", e.target.value)}
-        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={selectClass}
       >
         {propertyTypes.map((p) => (
-          <option key={p.value} value={p.value}>
-            {p.label}
-          </option>
+          <option key={p.value} value={p.value}>{p.label}</option>
         ))}
       </select>
 
       <select
         value={filters.currency}
         onChange={(e) => update("currency", e.target.value)}
-        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={selectClass}
       >
         {currencies.map((c) => (
-          <option key={c.value} value={c.value}>
-            {c.label}
-          </option>
+          <option key={c.value} value={c.value}>{c.label}</option>
         ))}
       </select>
 
@@ -96,13 +93,13 @@ export default function GlobalFilters({
             type="number"
             placeholder="Precio min"
             onChange={(e) => update("priceMin", Number(e.target.value))}
-            className="w-28 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-28 ${selectClass}`}
           />
           <input
             type="number"
             placeholder="Precio max"
             onChange={(e) => update("priceMax", Number(e.target.value))}
-            className="w-28 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-28 ${selectClass}`}
           />
         </>
       )}

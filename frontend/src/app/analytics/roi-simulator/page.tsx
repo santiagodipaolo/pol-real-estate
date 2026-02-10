@@ -77,6 +77,9 @@ const fields: { key: keyof FormState; label: string; hint: string; prefix?: stri
   },
 ];
 
+const inputClass =
+  "w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400";
+
 export default function ROISimulatorPage() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [result, setResult] = useState<ROISimulationResult | null>(null);
@@ -122,10 +125,10 @@ export default function ROISimulatorPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Simulador de ROI</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Simulador de ROI</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
           Calcule el retorno de inversion para una propiedad en Buenos Aires
         </p>
       </div>
@@ -135,18 +138,18 @@ export default function ROISimulatorPage() {
         <div className="lg:col-span-1">
           <form
             onSubmit={handleSubmit}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4"
+            className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4"
           >
-            <h2 className="text-lg font-semibold text-gray-900">Parametros</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Parametros</h2>
 
             {fields.map((field) => (
               <div key={field.key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-slate-600 mb-1">
                   {field.label}
                 </label>
                 <div className="relative">
                   {field.prefix && (
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
                       {field.prefix}
                     </span>
                   )}
@@ -155,17 +158,17 @@ export default function ROISimulatorPage() {
                     step="any"
                     value={form[field.key]}
                     onChange={(e) => updateField(field.key, e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`${inputClass} ${
                       field.prefix ? "pl-14" : ""
                     } ${field.suffix ? "pr-12" : ""}`}
                   />
                   {field.suffix && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
                       {field.suffix}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">{field.hint}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{field.hint}</p>
               </div>
             ))}
 
@@ -173,14 +176,14 @@ export default function ROISimulatorPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? "Calculando..." : "Calcular ROI"}
               </button>
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 Reset
               </button>
@@ -189,9 +192,9 @@ export default function ROISimulatorPage() {
         </div>
 
         {/* Results */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-sm text-rose-700">
               {error}
             </div>
           )}
@@ -209,6 +212,8 @@ export default function ROISimulatorPage() {
                   }
                   suffix="%"
                   subtitle="Tasa Interna de Retorno"
+                  icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>}
+                  accent="emerald"
                 />
                 <MetricCard
                   title="VAN (NPV)"
@@ -219,6 +224,7 @@ export default function ROISimulatorPage() {
                   }
                   prefix="USD "
                   subtitle="Valor Actual Neto"
+                  accent="indigo"
                 />
                 <MetricCard
                   title="Payback"
@@ -229,6 +235,7 @@ export default function ROISimulatorPage() {
                   }
                   suffix=" anios"
                   subtitle="Periodo de recupero"
+                  accent="amber"
                 />
                 <MetricCard
                   title="Cash on Cash"
@@ -239,6 +246,7 @@ export default function ROISimulatorPage() {
                   }
                   suffix="%"
                   subtitle="Retorno sobre efectivo"
+                  accent="rose"
                 />
               </div>
 
@@ -275,21 +283,21 @@ export default function ROISimulatorPage() {
               </div>
 
               {/* Summary */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">
                   Resumen de la Inversion
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Precio de compra:</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-slate-500">Precio de compra:</span>
+                      <span className="font-medium text-slate-900 font-mono">
                         USD {Number(form.purchase_price_usd).toLocaleString("es-AR")}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Costos de cierre ({form.closing_costs_pct}%):</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-slate-500">Costos de cierre ({form.closing_costs_pct}%):</span>
+                      <span className="font-medium text-slate-900 font-mono">
                         USD{" "}
                         {(
                           Number(form.purchase_price_usd) *
@@ -297,29 +305,29 @@ export default function ROISimulatorPage() {
                         ).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
                       </span>
                     </div>
-                    <div className="flex justify-between border-t border-gray-100 pt-2">
-                      <span className="text-gray-700 font-medium">Inversion total:</span>
-                      <span className="font-bold text-gray-900">
+                    <div className="flex justify-between border-t border-slate-100 pt-3">
+                      <span className="text-slate-700 font-semibold">Inversion total:</span>
+                      <span className="font-bold text-slate-900 font-mono">
                         USD {result.total_investment.toLocaleString("es-AR", { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Alquiler mensual:</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="text-slate-500">Alquiler mensual:</span>
+                      <span className="font-medium text-slate-900 font-mono">
                         USD {Number(form.monthly_rent_usd).toLocaleString("es-AR")}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Gastos mensuales:</span>
-                      <span className="font-medium text-red-600">
+                      <span className="text-slate-500">Gastos mensuales:</span>
+                      <span className="font-medium text-rose-600 font-mono">
                         -USD {Number(form.monthly_expenses_usd).toLocaleString("es-AR")}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Vacancia ({form.vacancy_rate}%):</span>
-                      <span className="font-medium text-red-600">
+                      <span className="text-slate-500">Vacancia ({form.vacancy_rate}%):</span>
+                      <span className="font-medium text-rose-600 font-mono">
                         -USD{" "}
                         {(
                           Number(form.monthly_rent_usd) *
@@ -328,9 +336,9 @@ export default function ROISimulatorPage() {
                         /mes
                       </span>
                     </div>
-                    <div className="flex justify-between border-t border-gray-100 pt-2">
-                      <span className="text-gray-700 font-medium">Ingreso neto anual:</span>
-                      <span className="font-bold text-green-700">
+                    <div className="flex justify-between border-t border-slate-100 pt-3">
+                      <span className="text-slate-700 font-semibold">Ingreso neto anual:</span>
+                      <span className="font-bold text-emerald-700 font-mono">
                         USD {result.annual_net_income.toLocaleString("es-AR", { maximumFractionDigits: 0 })}
                       </span>
                     </div>
@@ -341,26 +349,26 @@ export default function ROISimulatorPage() {
           )}
 
           {!result && !error && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <div className="bg-white rounded-2xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
+              <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4">
                 <svg
-                  className="w-8 h-8 text-blue-500"
+                  className="w-7 h-7 text-indigo-500"
                   fill="none"
                   viewBox="0 0 24 24"
+                  strokeWidth={1.5}
                   stroke="currentColor"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V13.5Zm0 2.25h.008v.008H8.25v-.008Zm0 2.25h.008v.008H8.25V18Zm2.498-6.75h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V13.5Zm0 2.25h.007v.008h-.007v-.008Zm0 2.25h.007v.008h-.007V18Zm2.504-6.75h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V13.5Zm0 2.25h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V18Zm2.498-6.75h.008v.008h-.008v-.008ZM18 13.5h.008v.008H18V13.5Zm-2.25 0h.008v.008h-.008V13.5Zm0-2.25h.008v.008h-.008v-.008ZM15.75 18h.008v.008h-.008V18Z"
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">
                 Simule su inversion
               </h3>
-              <p className="text-sm text-gray-500 max-w-md">
+              <p className="text-xs text-slate-500 max-w-md">
                 Complete los parametros en el formulario y presione &quot;Calcular ROI&quot;
                 para ver el analisis detallado de retorno de inversion.
               </p>

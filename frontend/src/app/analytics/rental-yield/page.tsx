@@ -59,7 +59,6 @@ export default function RentalYieldPage() {
       net: d.net_rental_yield != null ? Number(d.net_rental_yield.toFixed(2)) : 0,
     }));
 
-  // Compute summary stats
   const avgGross =
     sorted.length > 0
       ? sorted.reduce((sum, d) => sum + (d.gross_rental_yield ?? 0), 0) / sorted.length
@@ -70,33 +69,68 @@ export default function RentalYieldPage() {
       : null;
   const bestYield = sorted.length > 0 ? sorted[0] : null;
 
-  const SortIcon = ({ active, dir }: { active: boolean; dir: SortDir }) => (
-    <span className="ml-1 inline-block">
-      {active ? (dir === "desc" ? "\u2193" : "\u2191") : "\u2195"}
-    </span>
+  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
+    <th
+      className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortKey === field && (
+          <svg className={`w-3 h-3 ${sortDir === "asc" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        )}
+      </div>
+    </th>
   );
 
+  if (loading) {
+    return (
+      <div className="space-y-5">
+        <div className="h-8 w-56 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 bg-white rounded-2xl border border-slate-100 animate-pulse" />
+          ))}
+        </div>
+        <div className="h-[560px] bg-white rounded-2xl border border-slate-100 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-sm text-rose-700">
+        {error}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Rentabilidad por Barrio</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Rentabilidad por Barrio</h1>
+        <p className="text-sm text-slate-500 mt-0.5">
           Rendimiento bruto y neto estimado por barrio en Buenos Aires (CABA)
         </p>
       </div>
 
       {/* KPI Cards */}
-      {!loading && !error && sorted.length > 0 && (
+      {sorted.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Yield Bruto Promedio"
             value={avgGross != null ? avgGross.toFixed(2) : null}
             suffix="%"
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>}
+            accent="emerald"
           />
           <MetricCard
             title="Yield Neto Promedio"
             value={avgNet != null ? avgNet.toFixed(2) : null}
             suffix="%"
+            accent="indigo"
           />
           <MetricCard
             title="Mejor Barrio (Bruto)"
@@ -106,186 +140,129 @@ export default function RentalYieldPage() {
                 ? `${bestYield.gross_rental_yield.toFixed(2)}%`
                 : undefined
             }
+            accent="amber"
           />
           <MetricCard
             title="Barrios Analizados"
             value={sorted.length}
+            accent="slate"
           />
         </div>
       )}
 
       {/* Bar Chart */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold mb-4">
+      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4">
           Top 20 Barrios por Rentabilidad Bruta
         </h2>
-        {loading ? (
-          <div className="flex items-center justify-center h-80">
-            <div className="flex items-center gap-3 text-gray-400">
-              <svg
-                className="animate-spin h-5 w-5"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
+        <ResponsiveContainer width="100%" height={500}>
+          <BarChart data={chartData} layout="vertical" margin={{ left: 100, right: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+            <XAxis
+              type="number"
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tickFormatter={(v) => `${v}%`}
+              domain={[0, "auto"]}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fontSize: 11, fill: "#475569" }}
+              width={100}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "white",
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                fontSize: "12px",
+                padding: "8px 12px",
+              }}
+              formatter={(value) => [
+                `${Number(value).toFixed(2)}%`,
+              ]}
+              cursor={{ fill: "rgba(99, 102, 241, 0.05)" }}
+            />
+            <Bar dataKey="gross" name="Bruto" radius={[0, 6, 6, 0]} barSize={14}>
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-gross-${index}`}
+                  fill={entry.gross >= (avgGross ?? 0) ? "#10b981" : "#6366f1"}
                 />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                />
-              </svg>
-              Cargando datos...
-            </div>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-80 text-red-500">
-            {error}
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={500}>
-            <BarChart data={chartData} layout="vertical" margin={{ left: 100 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11 }}
-                tickFormatter={(v) => `${v}%`}
-                domain={[0, "auto"]}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 11 }}
-                width={100}
-              />
-              <Tooltip
-                formatter={(value) => [
-                  `${Number(value).toFixed(2)}%`,
-                ]}
-              />
-              <Bar dataKey="gross" name="Bruto" radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-gross-${index}`}
-                    fill={entry.gross >= (avgGross ?? 0) ? "#16a34a" : "#2563eb"}
-                  />
-                ))}
-              </Bar>
-              <Bar dataKey="net" name="Neto" fill="#94a3b8" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+              ))}
+            </Bar>
+            <Bar dataKey="net" name="Neto" fill="#cbd5e1" radius={[0, 6, 6, 0]} barSize={14} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Table */}
-      {!loading && !error && sorted.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold">Detalle por Barrio</h2>
+      {sorted.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-900">Detalle por Barrio</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="min-w-full">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 font-medium text-gray-600">#</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Barrio</th>
-                  <th
-                    className="px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
-                    onClick={() => handleSort("median_sale_price_usd_m2")}
-                  >
-                    Precio Venta USD/m2
-                    <SortIcon
-                      active={sortKey === "median_sale_price_usd_m2"}
-                      dir={sortDir}
-                    />
-                  </th>
-                  <th
-                    className="px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
-                    onClick={() => handleSort("median_rent_usd_m2")}
-                  >
-                    Alquiler USD/m2
-                    <SortIcon
-                      active={sortKey === "median_rent_usd_m2"}
-                      dir={sortDir}
-                    />
-                  </th>
-                  <th
-                    className="px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
-                    onClick={() => handleSort("gross_rental_yield")}
-                  >
-                    Yield Bruto
-                    <SortIcon
-                      active={sortKey === "gross_rental_yield"}
-                      dir={sortDir}
-                    />
-                  </th>
-                  <th
-                    className="px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none"
-                    onClick={() => handleSort("net_rental_yield")}
-                  >
-                    Yield Neto
-                    <SortIcon
-                      active={sortKey === "net_rental_yield"}
-                      dir={sortDir}
-                    />
-                  </th>
+                <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">#</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Barrio</th>
+                  <SortHeader label="Precio Venta USD/m2" field="median_sale_price_usd_m2" />
+                  <SortHeader label="Alquiler USD/m2" field="median_rent_usd_m2" />
+                  <SortHeader label="Yield Bruto" field="gross_rental_yield" />
+                  <SortHeader label="Yield Neto" field="net_rental_yield" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {sorted.map((row, idx) => (
                   <tr
                     key={row.barrio_id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${idx % 2 === 0 ? "" : "bg-slate-25"}`}
                   >
-                    <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
+                    <td className="px-4 py-3 text-xs text-slate-400">{idx + 1}</td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/barrios/${row.slug}`}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
                       >
                         {row.barrio_name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-sm font-mono text-slate-700">
                       {row.median_sale_price_usd_m2 != null
                         ? `$${row.median_sale_price_usd_m2.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`
-                        : "—"}
+                        : "\u2014"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-sm font-mono text-slate-700">
                       {row.median_rent_usd_m2 != null
                         ? `$${row.median_rent_usd_m2.toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
-                        : "—"}
+                        : "\u2014"}
                     </td>
                     <td className="px-4 py-3">
                       {row.gross_rental_yield != null ? (
                         <span
-                          className={`font-semibold ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
                             row.gross_rental_yield >= (avgGross ?? 0)
-                              ? "text-green-600"
-                              : "text-gray-700"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
                           {row.gross_rental_yield.toFixed(2)}%
                         </span>
                       ) : (
-                        "—"
+                        <span className="text-sm text-slate-400">{"\u2014"}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {row.net_rental_yield != null ? (
-                        <span className="text-gray-700">
-                          {row.net_rental_yield.toFixed(2)}%
-                        </span>
-                      ) : (
-                        "—"
-                      )}
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {row.net_rental_yield != null
+                        ? `${row.net_rental_yield.toFixed(2)}%`
+                        : "\u2014"}
                     </td>
                   </tr>
                 ))}

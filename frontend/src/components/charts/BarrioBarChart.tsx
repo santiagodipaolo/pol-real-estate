@@ -21,7 +21,7 @@ interface BarrioBarChartProps {
 export default function BarrioBarChart({
   data,
   title,
-  color = "#2563eb",
+  color = "#6366f1",
   valuePrefix = "$",
   valueSuffix = "/m2",
 }: BarrioBarChartProps) {
@@ -32,7 +32,7 @@ export default function BarrioBarChart({
 
   if (!filtered.length) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
         Sin datos disponibles
       </div>
     );
@@ -40,28 +40,45 @@ export default function BarrioBarChart({
 
   return (
     <div>
-      {title && <h3 className="text-lg font-semibold mb-4">{title}</h3>}
+      {title && (
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={filtered} layout="vertical" margin={{ left: 80 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <BarChart data={filtered} layout="vertical" margin={{ left: 80, right: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
           <XAxis
             type="number"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 10, fill: "#94a3b8" }}
             tickFormatter={(v) => `${valuePrefix}${(v as number).toLocaleString()}`}
+            axisLine={false}
+            tickLine={false}
           />
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: "#475569" }}
             width={80}
+            axisLine={false}
+            tickLine={false}
           />
           <Tooltip
+            contentStyle={{
+              backgroundColor: "white",
+              border: "1px solid #e2e8f0",
+              borderRadius: "12px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              fontSize: "12px",
+              padding: "8px 12px",
+            }}
             formatter={(value) => [
               `${valuePrefix}${Number(value).toLocaleString("es-AR", { maximumFractionDigits: 0 })}${valueSuffix}`,
               "Valor",
             ]}
+            cursor={{ fill: "rgba(99, 102, 241, 0.05)" }}
           />
-          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} barSize={16} />
         </BarChart>
       </ResponsiveContainer>
     </div>
