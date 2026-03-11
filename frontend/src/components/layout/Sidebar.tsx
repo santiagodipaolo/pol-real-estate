@@ -107,7 +107,7 @@ const navItems = [
     ),
   },
   {
-    href: "/analytics/oportunidades",
+    href: "/oportunidades",
     label: "Oportunidades",
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">

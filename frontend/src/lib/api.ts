@@ -131,6 +131,18 @@ export async function getOpportunities(operationType?: string, threshold?: numbe
   return fetchAPI<OpportunitiesResponse>(`/analytics/opportunities?${params}`);
 }
 
+// Opportunities (ML-scored)
+export async function getScoredOpportunities(minScore = 0, limit = 100) {
+  return fetchAPI<OpportunityScoredResponse>(`/opportunities/scored?min_score=${minScore}&limit=${limit}`);
+}
+
+export async function analyzeURL(url: string) {
+  return fetchAPI<AnalyzeURLResponse>("/opportunities/analyze-url", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
 // Valuation
 export async function estimateValuation(data: ValuationRequest) {
   return fetchAPI<ValuationResponse>("/valuation/estimate", {
@@ -406,4 +418,53 @@ export interface OpportunitiesResponse {
   total: number;
   avg_discount_pct: number | null;
   top_barrio: string | null;
+}
+
+export interface OpportunityScoredItem {
+  listing_id: string;
+  url: string | null;
+  title: string | null;
+  barrio_name: string | null;
+  property_type: string;
+  surface_total_m2: number;
+  rooms: number | null;
+  listed_price_usd: number;
+  listed_price_usd_m2: number;
+  estimated_price_usd: number;
+  estimated_price_usd_m2: number;
+  estimated_low: number;
+  estimated_high: number;
+  score: number;
+  discount_pct: number;
+  verdict: string;
+}
+
+export interface OpportunityScoredResponse {
+  items: OpportunityScoredItem[];
+  total: number;
+  avg_score: number;
+  best_barrio: string | null;
+}
+
+export interface AnalyzeURLResponse {
+  url: string;
+  title: string | null;
+  barrio_name: string | null;
+  property_type: string;
+  operation_type: string;
+  surface_total_m2: number | null;
+  rooms: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  garages: number | null;
+  listed_price_usd: number | null;
+  listed_price_usd_m2: number | null;
+  estimated_price_usd: number | null;
+  estimated_price_usd_m2: number | null;
+  estimated_low: number | null;
+  estimated_high: number | null;
+  score: number | null;
+  discount_pct: number | null;
+  verdict: string | null;
+  confidence: string | null;
 }
