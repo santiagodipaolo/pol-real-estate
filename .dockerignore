@@ -1,0 +1,14 @@
+frontend/
+.git/
+.claude/
+scripts/
+backend/.venv/
+backend/__pycache__/
+backend/data/
+backend/scripts/
+backend/.env
+backend/.env.local
+*.pyc
+.DS_Store
+node_modules/
+.next/
