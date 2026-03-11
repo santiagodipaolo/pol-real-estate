@@ -34,5 +34,5 @@ Thumbs.db
 # Docker
 docker-volumes/
 
-# ML models (binary, regenerable)
-backend/models/*.joblib
+# ML models — tracked (small, needed for deploy)
+# backend/models/*.joblib
