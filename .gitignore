@@ -33,3 +33,6 @@ Thumbs.db
 
 # Docker
 docker-volumes/
+
+# ML models — tracked (small, needed for deploy)
+# backend/models/*.joblib

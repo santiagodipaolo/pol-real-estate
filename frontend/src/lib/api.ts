@@ -131,7 +131,53 @@ export async function getOpportunities(operationType?: string, threshold?: numbe
   return fetchAPI<OpportunitiesResponse>(`/analytics/opportunities?${params}`);
 }
 
+// Valuation
+export async function estimateValuation(data: ValuationRequest) {
+  return fetchAPI<ValuationResponse>("/valuation/estimate", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getValuationMetrics() {
+  return fetchAPI<ValuationMetrics>("/valuation/metrics");
+}
+
 // Types
+export interface ValuationRequest {
+  surface_total_m2: number;
+  surface_covered_m2?: number;
+  rooms?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  garages?: number;
+  age_years?: number;
+  expenses_ars?: number;
+  property_type?: string;
+  barrio_id?: number;
+  barrio_name?: string;
+}
+
+export interface ValuationResponse {
+  price_usd: number;
+  price_usd_low: number;
+  price_usd_high: number;
+  price_usd_m2: number;
+  price_usd_m2_low: number;
+  price_usd_m2_high: number;
+  surface_total_m2: number;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface ValuationMetrics {
+  samples: number;
+  features: number;
+  mae_cv: number;
+  mae_pct: number;
+  median_price_usd_m2: number;
+  feature_importance: Record<string, number>;
+}
+
 export interface CurrencyRate {
   rate_type: string;
   buy: number | null;
