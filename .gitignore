@@ -33,3 +33,6 @@ Thumbs.db
 
 # Docker
 docker-volumes/
+
+# ML models (binary, regenerable)
+backend/models/*.joblib
