@@ -58,6 +58,7 @@ def load_listings(operation: str) -> pd.DataFrame:
           AND l.is_active = true
           AND l.price_usd_blue > 0
           AND l.surface_total_m2 > 0
+          AND l.canonical_id IS NULL
     """)
 
     df = pd.read_sql(query, engine, params={"operation": operation})
