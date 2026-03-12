@@ -54,9 +54,27 @@ FEATURE_COLUMNS = [
     "is_front",
     "condition_encoded",
     "amenity_count",
+    # Geo features
+    "latitude",
+    "longitude",
+    # Derived features
+    "surface_per_room",
+    "log_barrio_median",
 ]
 
 TARGET_COLUMN = "price_usd_m2"
+LOG_TARGET_COLUMN = "log_price_usd_m2"
+
+
+def filter_outliers(df: pd.DataFrame, column: str = TARGET_COLUMN, iqr_factor: float = 2.0) -> pd.DataFrame:
+    """Remove outliers using IQR method. More robust than fixed thresholds."""
+    q1 = df[column].quantile(0.05)
+    q3 = df[column].quantile(0.95)
+    iqr = q3 - q1
+    lower = q1 - iqr_factor * iqr
+    upper = q3 + iqr_factor * iqr
+    mask = (df[column] >= lower) & (df[column] <= upper)
+    return df[mask]
 
 
 def compute_barrio_stats(df: pd.DataFrame) -> pd.DataFrame:
@@ -135,6 +153,18 @@ def engineer_features(df: pd.DataFrame, barrio_stats: pd.DataFrame | None = None
     else:
         df["amenity_count"] = 0
 
+    # Geo features — fill missing with CABA centroid
+    CABA_LAT, CABA_LNG = -34.6037, -58.3816
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce").fillna(CABA_LAT)
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce").fillna(CABA_LNG)
+
+    # Derived: surface per room (efficiency metric)
+    df["surface_per_room"] = np.where(
+        df["rooms"].fillna(1) > 0,
+        df["surface_total_m2"] / df["rooms"].fillna(1).clip(lower=1),
+        df["surface_total_m2"],
+    )
+
     # Barrio stats
     if barrio_stats is None:
         barrio_stats = compute_barrio_stats(df)
@@ -145,6 +175,13 @@ def engineer_features(df: pd.DataFrame, barrio_stats: pd.DataFrame | None = None
     global_median = df["price_usd_m2"].median() if "price_usd_m2" in df.columns else 2500
     df["barrio_median_usd_m2"] = df["barrio_median_usd_m2"].fillna(global_median)
     df["barrio_listing_count"] = df["barrio_listing_count"].fillna(1)
+
+    # Log-transformed barrio median (reduces skew)
+    df["log_barrio_median"] = np.log1p(df["barrio_median_usd_m2"])
+
+    # Log-transformed target for training
+    if "price_usd_m2" in df.columns:
+        df["log_price_usd_m2"] = np.log1p(df["price_usd_m2"])
 
     # Fill missing numerical features
     df["surface_covered_m2"] = df["surface_covered_m2"].fillna(df["surface_total_m2"])

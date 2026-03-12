@@ -159,7 +159,7 @@ async def get_scored_opportunities(
                        l.property_type, l.surface_total_m2, l.surface_covered_m2,
                        l.rooms, l.bedrooms, l.bathrooms, l.garages,
                        l.age_years, l.expenses_ars, l.price_usd_blue,
-                       l.barrio_id
+                       l.barrio_id, l.latitude, l.longitude
                 FROM listings l
                 LEFT JOIN barrios b ON l.barrio_id = b.id
                 WHERE l.is_active = true
@@ -193,6 +193,8 @@ async def get_scored_opportunities(
                 expenses_ars=float(row.expenses_ars) if row.expenses_ars else None,
                 property_type=row.property_type,
                 barrio_id=row.barrio_id,
+                latitude=float(row.latitude) if row.latitude else None,
+                longitude=float(row.longitude) if row.longitude else None,
             )
 
             opp = _compute_opportunity_score(

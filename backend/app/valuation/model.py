@@ -18,9 +18,11 @@ from sklearn.model_selection import cross_val_score
 
 from app.valuation.features import (
     FEATURE_COLUMNS,
+    LOG_TARGET_COLUMN,
     TARGET_COLUMN,
     compute_barrio_stats,
     engineer_features,
+    filter_outliers,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,19 +57,25 @@ class ValuationModel:
         mask = (
             df_feat[TARGET_COLUMN].notna()
             & (df_feat[TARGET_COLUMN] > 0)
-            & (df_feat[TARGET_COLUMN] < 15000)  # Filter extreme outliers
             & df_feat["surface_total_m2"].notna()
             & (df_feat["surface_total_m2"] > 10)
         )
         df_clean = df_feat[mask].copy()
 
+        # IQR-based outlier removal (replaces fixed 15000 threshold)
+        before = len(df_clean)
+        df_clean = filter_outliers(df_clean, TARGET_COLUMN)
+        logger.info("Outlier filter: %d → %d samples (removed %d)", before, len(df_clean), before - len(df_clean))
+
         if len(df_clean) < 20:
             raise ValueError(f"Not enough data to train: {len(df_clean)} rows (need >= 20)")
 
         X = df_clean[FEATURE_COLUMNS].values
-        y = df_clean[TARGET_COLUMN].values
+        # Train on log-transformed target (reduces skew, improves predictions on expensive properties)
+        y_log = df_clean[LOG_TARGET_COLUMN].values
+        y_raw = df_clean[TARGET_COLUMN].values
 
-        logger.info("Training on %d samples with %d features", len(X), len(FEATURE_COLUMNS))
+        logger.info("Training on %d samples with %d features (log-target)", len(X), len(FEATURE_COLUMNS))
 
         # Common params
         base_params = {
@@ -80,12 +88,12 @@ class ValuationModel:
             "random_state": 42,
         }
 
-        # Median model (main predictor)
+        # Median model (main predictor) — trained on log-target
         self.model_median = xgb.XGBRegressor(
             objective="reg:squarederror",
             **base_params,
         )
-        self.model_median.fit(X, y)
+        self.model_median.fit(X, y_log)
 
         # Low bound (10th percentile)
         self.model_low = xgb.XGBRegressor(
@@ -93,7 +101,7 @@ class ValuationModel:
             quantile_alpha=0.10,
             **base_params,
         )
-        self.model_low.fit(X, y)
+        self.model_low.fit(X, y_log)
 
         # High bound (90th percentile)
         self.model_high = xgb.XGBRegressor(
@@ -101,21 +109,31 @@ class ValuationModel:
             quantile_alpha=0.90,
             **base_params,
         )
-        self.model_high.fit(X, y)
+        self.model_high.fit(X, y_log)
 
-        # Cross-validation score
+        # Cross-validation on log-target, then convert MAE back to real scale
+        from sklearn.metrics import make_scorer
+
+        def mae_real_scale(y_true_log, y_pred_log):
+            """MAE in real USD/m² from log-space predictions."""
+            return -np.mean(np.abs(np.expm1(y_true_log) - np.expm1(y_pred_log)))
+
+        cv_scorer = make_scorer(mae_real_scale, greater_is_better=True)
         cv_scores = cross_val_score(
             xgb.XGBRegressor(objective="reg:squarederror", **base_params),
-            X, y, cv=min(5, len(X) // 5), scoring="neg_mean_absolute_error",
+            X, y_log, cv=min(5, len(X) // 5), scoring=cv_scorer,
         )
+
+        mae_real = float(-cv_scores.mean())
+        median_price = float(np.median(y_raw))
 
         self.metrics = {
             "samples": len(X),
             "features": len(FEATURE_COLUMNS),
-            "mae_cv": float(-cv_scores.mean()),
+            "mae_cv": round(mae_real, 1),
             "mae_cv_std": float(cv_scores.std()),
-            "median_price_usd_m2": float(np.median(y)),
-            "mae_pct": float(-cv_scores.mean() / np.median(y) * 100),
+            "median_price_usd_m2": median_price,
+            "mae_pct": round(mae_real / median_price * 100, 1),
         }
 
         logger.info(
@@ -150,6 +168,8 @@ class ValuationModel:
         orientation: str | None = None,
         condition: str | None = None,
         amenities: dict | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> dict:
         """Predict the valuation for a single property.
 
@@ -176,15 +196,18 @@ class ValuationModel:
             "orientation": orientation,
             "condition": condition,
             "amenities": amenities or {},
+            "latitude": latitude,
+            "longitude": longitude,
         }])
 
         row_feat = engineer_features(row, barrio_stats=self.barrio_stats)
 
         X = row_feat[FEATURE_COLUMNS].values
 
-        pred_median = float(self.model_median.predict(X)[0])
-        pred_low = float(self.model_low.predict(X)[0])
-        pred_high = float(self.model_high.predict(X)[0])
+        # Predictions are in log space — convert back with expm1
+        pred_median = float(np.expm1(self.model_median.predict(X)[0]))
+        pred_low = float(np.expm1(self.model_low.predict(X)[0]))
+        pred_high = float(np.expm1(self.model_high.predict(X)[0]))
 
         # Ensure bounds are ordered
         pred_low, pred_high = min(pred_low, pred_median), max(pred_high, pred_median)
