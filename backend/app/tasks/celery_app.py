@@ -53,13 +53,13 @@ celery_app.conf.beat_schedule = {
     "scrape-zonaprop-sale-every-6h": {
         "task": "app.tasks.scraper_tasks.scrape_zonaprop",
         "schedule": crontab(hour="*/6", minute=30),
-        "args": ["sale", 10],
+        "args": ["sale", 50],
         "options": {"queue": "default"},
     },
     "scrape-zonaprop-rent-every-6h": {
         "task": "app.tasks.scraper_tasks.scrape_zonaprop",
         "schedule": crontab(hour="1,7,13,19", minute=30),
-        "args": ["rent", 10],
+        "args": ["rent", 50],
         "options": {"queue": "default"},
     },
 }
