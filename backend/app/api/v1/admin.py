@@ -321,17 +321,13 @@ async def enrich(
 
 async def _run_enrich_bg(batch_size: int, source: str | None):
     try:
-        result = _run_enrich_sync(batch_size, source)
+        from app.scrapers.pipeline import enrich_listings
+        result = await enrich_listings(batch_size=batch_size, source=source)
         _update_status("enrich", "ok", result)
         logger.info("Enrich done: %s", result)
     except Exception as exc:
         _update_status("enrich", "failed", {"error": str(exc)})
         logger.exception("Enrich failed")
-
-
-def _run_enrich_sync(batch_size: int, source: str | None) -> dict:
-    from app.scrapers.pipeline import enrich_listings
-    return enrich_listings(batch_size=batch_size, source=source)
 
 
 @router.get("/status")
