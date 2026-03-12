@@ -40,22 +40,30 @@ def _update_status(task: str, status: str, result: dict | None = None) -> None:
 
 
 def _run_scrape_sync(operation: str, max_pages: int) -> dict:
-    """Run the async scraper in a sync context."""
+    """Run scrapers (Zonaprop + Argenprop) in a sync context."""
     from app.scrapers.zonaprop import ZonapropScraper
+    from app.scrapers.argenprop import ArgenpropScraper
     from app.scrapers.pipeline import save_listings
 
     async def _scrape():
-        scraper = ZonapropScraper(headless=True)
-        try:
-            listings = await scraper.scrape_listings(
-                operation=operation,
-                max_pages=max_pages,
-            )
-            if listings:
-                return save_listings(listings)
-            return {"created": 0, "updated": 0, "skipped": 0}
-        finally:
-            await scraper.close()
+        all_listings = []
+        for ScraperClass in [ZonapropScraper, ArgenpropScraper]:
+            scraper = ScraperClass(headless=True)
+            try:
+                listings = await scraper.scrape_listings(
+                    operation=operation,
+                    max_pages=max_pages,
+                )
+                logger.info("%s %s: %d listings", ScraperClass.source_name, operation, len(listings))
+                all_listings.extend(listings)
+            except Exception:
+                logger.exception("%s %s failed", ScraperClass.source_name, operation)
+            finally:
+                await scraper.close()
+
+        if all_listings:
+            return save_listings(all_listings)
+        return {"created": 0, "updated": 0, "skipped": 0, "deduped": 0}
 
     return asyncio.run(_scrape())
 
