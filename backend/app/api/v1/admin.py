@@ -31,10 +31,11 @@ def _verify_admin_key(x_admin_key: str = Header(...)) -> None:
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
-def _update_status(task: str, **kwargs) -> None:
+def _update_status(task: str, status: str, result: dict | None = None) -> None:
     _run_status[task] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        **kwargs,
+        "status": status,
+        **({"result": result} if result else {}),
     }
 
 
@@ -84,7 +85,7 @@ def _run_retrain_sync(operation: str) -> dict:
     engine.dispose()
 
     if len(df) < 20:
-        return {"status": "skipped", "reason": f"Not enough data ({len(df)} listings, need 20+)"}
+        return {"reason": f"Not enough data ({len(df)} listings, need 20+)"}
 
     model = ValuationModel()
     metrics = model.train(df)
@@ -92,7 +93,6 @@ def _run_retrain_sync(operation: str) -> dict:
     model.save(model_name)
 
     return {
-        "status": "trained",
         "model_name": model_name,
         "samples": metrics["samples"],
         "mae_pct": round(metrics["mae_pct"], 1),
@@ -141,14 +141,14 @@ def _background_pipeline(
     fetch_rates: bool,
 ) -> None:
     """Run the full pipeline in background."""
-    _update_status("pipeline", status="running", operations=operations)
+    _update_status("pipeline", "running")
 
     try:
         # 1. Fetch currency rates
         if fetch_rates:
             logger.info("Pipeline: fetching currency rates...")
             rates_result = _run_currency_sync()
-            _update_status("currency", status="ok", **rates_result)
+            _update_status("currency", "ok", rates_result)
             logger.info("Pipeline: currency rates done: %s", rates_result)
 
         # 2. Scrape
@@ -157,7 +157,7 @@ def _background_pipeline(
             logger.info("Pipeline: scraping %s (%d pages)...", op, max_pages)
             result = _run_scrape_sync(op, max_pages)
             scrape_results[op] = result
-            _update_status(f"scrape_{op}", status="ok", **result)
+            _update_status(f"scrape_{op}", "ok", result)
             logger.info("Pipeline: %s scrape done: %s", op, result)
 
         # 3. Retrain
@@ -167,7 +167,7 @@ def _background_pipeline(
                 logger.info("Pipeline: retraining %s model...", op)
                 result = _run_retrain_sync(op)
                 retrain_results[op] = result
-                _update_status(f"retrain_{op}", status="ok", **result)
+                _update_status(f"retrain_{op}", "ok", result)
                 logger.info("Pipeline: %s retrain done: %s", op, result)
 
             # Reload models in the valuation API (reset singleton)
@@ -178,13 +178,15 @@ def _background_pipeline(
             except Exception:
                 logger.warning("Pipeline: could not clear valuation model cache")
 
-        _update_status("pipeline", status="completed",
-                       scrape=scrape_results, retrain=retrain_results)
+        _update_status("pipeline", "completed", {
+            "scrape": scrape_results,
+            "retrain": retrain_results,
+        })
         logger.info("Pipeline completed successfully")
 
     except Exception as exc:
         logger.exception("Pipeline failed: %s", exc)
-        _update_status("pipeline", status="failed", error=str(exc))
+        _update_status("pipeline", "failed", {"error": str(exc)})
 
 
 # --- Endpoints ---
@@ -202,7 +204,7 @@ async def scrape(
     if max_pages < 1 or max_pages > 100:
         raise HTTPException(400, "max_pages must be 1-100")
 
-    _update_status(f"scrape_{operation}", status="running")
+    _update_status(f"scrape_{operation}", "running")
     background_tasks.add_task(_run_scrape_bg, operation, max_pages)
     return {"status": "started", "operation": operation, "max_pages": max_pages}
 
@@ -210,10 +212,10 @@ async def scrape(
 async def _run_scrape_bg(operation: str, max_pages: int):
     try:
         result = _run_scrape_sync(operation, max_pages)
-        _update_status(f"scrape_{operation}", status="ok", **result)
+        _update_status(f"scrape_{operation}", "ok", result)
         logger.info("Scrape %s done: %s", operation, result)
     except Exception as exc:
-        _update_status(f"scrape_{operation}", status="failed", error=str(exc))
+        _update_status(f"scrape_{operation}", "failed", {"error": str(exc)})
         logger.exception("Scrape %s failed", operation)
 
 
@@ -227,7 +229,7 @@ async def retrain(
     if operation not in ("sale", "rent"):
         raise HTTPException(400, "operation must be 'sale' or 'rent'")
 
-    _update_status(f"retrain_{operation}", status="running")
+    _update_status(f"retrain_{operation}", "running")
     background_tasks.add_task(_run_retrain_bg, operation)
     return {"status": "started", "operation": operation}
 
@@ -235,10 +237,10 @@ async def retrain(
 async def _run_retrain_bg(operation: str):
     try:
         result = _run_retrain_sync(operation)
-        _update_status(f"retrain_{operation}", status="ok", **result)
+        _update_status(f"retrain_{operation}", "ok", result)
         logger.info("Retrain %s done: %s", operation, result)
     except Exception as exc:
-        _update_status(f"retrain_{operation}", status="failed", error=str(exc))
+        _update_status(f"retrain_{operation}", "failed", {"error": str(exc)})
         logger.exception("Retrain %s failed", operation)
 
 
