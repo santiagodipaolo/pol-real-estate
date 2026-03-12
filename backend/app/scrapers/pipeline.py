@@ -14,7 +14,7 @@ import random
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.barrio import Barrio
 from app.models.listing import Listing
+from app.models.listing_price_history import ListingPriceHistory
 from app.scrapers.base import RawListing
 
 logger = logging.getLogger(__name__)
@@ -203,6 +204,18 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
                 fp = compute_fingerprint(raw)
 
                 if existing:
+                    # Record price history if price changed
+                    if raw.price is not None and existing.price_original is not None:
+                        new_price = Decimal(str(raw.price))
+                        if new_price != existing.price_original:
+                            session.add(ListingPriceHistory(
+                                listing_id=existing.id,
+                                price_usd_blue=existing.price_usd_blue,
+                                price_ars=existing.price_ars,
+                                currency_original=existing.currency_original,
+                                price_original=existing.price_original,
+                            ))
+
                     # Update: refresh price, last_seen, active status
                     existing.price_original = Decimal(str(raw.price)) if raw.price else existing.price_original
                     existing.currency_original = raw.currency
@@ -210,6 +223,7 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
                     existing.price_ars = price_ars or existing.price_ars
                     existing.last_seen_at = now
                     existing.is_active = True
+                    existing.deactivated_at = None
                     existing.days_on_market = (now - existing.first_seen_at).days
                     if raw.surface_total_m2 and not existing.surface_total_m2:
                         existing.surface_total_m2 = Decimal(str(raw.surface_total_m2))
@@ -286,6 +300,29 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
         created, updated, skipped, deduped,
     )
     return {"created": created, "updated": updated, "skipped": skipped, "deduped": deduped}
+
+
+def deactivate_stale_listings(days_threshold: int = 7) -> dict:
+    """Mark listings as inactive if not seen in >days_threshold days."""
+    engine = create_engine(settings.sync_database_url)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days_threshold)
+
+    with Session(engine) as session:
+        result = session.execute(
+            text("""
+                UPDATE listings
+                SET is_active = false, deactivated_at = :now
+                WHERE is_active = true AND last_seen_at < :cutoff
+            """),
+            {"now": now, "cutoff": cutoff},
+        )
+        count = result.rowcount
+        session.commit()
+
+    engine.dispose()
+    logger.info("Deactivated %d stale listings (threshold=%d days)", count, days_threshold)
+    return {"deactivated": count, "threshold_days": days_threshold}
 
 
 async def enrich_listings(batch_size: int = 20, source: str | None = None) -> dict:

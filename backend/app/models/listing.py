@@ -47,6 +47,7 @@ class Listing(Base):
     first_seen_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_seen_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     is_active = Column(Boolean, default=True)
+    deactivated_at = Column(DateTime(timezone=True))
     days_on_market = Column(Integer)
 
     barrio = relationship("Barrio", back_populates="listings")

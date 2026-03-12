@@ -172,6 +172,13 @@ def _background_pipeline(
             _update_status(f"scrape_{op}", "ok", result)
             logger.info("Pipeline: %s scrape done: %s", op, result)
 
+        # 2.5 Deactivate stale listings
+        from app.scrapers.pipeline import deactivate_stale_listings
+        logger.info("Pipeline: deactivating stale listings...")
+        deactivation_result = deactivate_stale_listings(days_threshold=7)
+        _update_status("deactivate_stale", "ok", deactivation_result)
+        logger.info("Pipeline: deactivation done: %s", deactivation_result)
+
         # 3. Enrich detail pages
         enrich_result = {}
         if enrich:
@@ -200,6 +207,7 @@ def _background_pipeline(
 
         _update_status("pipeline", "completed", {
             "scrape": scrape_results,
+            "deactivated": deactivation_result,
             "enrich": enrich_result,
             "retrain": retrain_results,
         })
@@ -216,7 +224,7 @@ def _background_pipeline(
 async def scrape(
     background_tasks: BackgroundTasks,
     operation: str = "sale",
-    max_pages: int = 10,
+    max_pages: int = 50,
     _: None = Depends(_verify_admin_key),
 ):
     """Trigger a scraping run. Runs in background."""
@@ -268,7 +276,7 @@ async def _run_retrain_bg(operation: str):
 @router.post("/pipeline")
 async def pipeline(
     background_tasks: BackgroundTasks,
-    max_pages: int = 10,
+    max_pages: int = 50,
     retrain: bool = True,
     fetch_rates: bool = True,
     sale: bool = True,
