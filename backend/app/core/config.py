@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    ADMIN_API_KEY: str = ""
+
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000"
 
     DOLAR_API_BASE_URL: str = "https://dolarapi.com/v1"
