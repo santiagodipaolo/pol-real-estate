@@ -7,6 +7,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.map import router as map_router
 from app.api.v1.valuation import router as valuation_router
 from app.api.v1.opportunities import router as opportunities_router
+from app.api.v1.admin import router as admin_router
 
 router = APIRouter()
 router.include_router(currency_router, prefix="/currency", tags=["currency"])
@@ -16,3 +17,4 @@ router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 router.include_router(map_router, prefix="/map", tags=["map"])
 router.include_router(valuation_router, prefix="/valuation", tags=["valuation"])
 router.include_router(opportunities_router, prefix="/opportunities", tags=["opportunities"])
+router.include_router(admin_router, prefix="/admin", tags=["admin"])
