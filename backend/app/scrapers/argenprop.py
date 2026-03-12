@@ -23,6 +23,13 @@ from typing import Any
 from playwright.async_api import Browser, Page, Playwright, async_playwright
 
 from app.scrapers.base import BaseScraper, RawListing
+from app.scrapers.detail import (
+    DetailData,
+    parse_amenities_from_text,
+    parse_condition,
+    parse_floor,
+    parse_orientation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +381,121 @@ class ArgenpropScraper(BaseScraper):
                 await asyncio.sleep(random.uniform(3, 7))
 
         return all_listings
+
+    async def scrape_detail(self, url: str) -> DetailData | None:
+        """Scrape enriched data from an individual Argenprop listing page.
+
+        Uses pure DOM extraction (server-rendered HTML).
+        """
+        page = await self._new_page()
+        try:
+            logger.info("Detail: fetching %s", url)
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            if not response or response.status not in (200, 202):
+                logger.warning("Detail: got status %s on %s", response.status if response else "None", url)
+                return None
+
+            await page.wait_for_timeout(random.randint(2000, 4000))
+
+            # Description
+            desc_el = await page.query_selector(".section-description--content, .description-content, [class*='description']")
+            description = (await desc_el.inner_text()).strip()[:5000] if desc_el else None
+
+            # Feature sections — collect all feature text
+            feature_texts: list[str] = []
+            feat_items = await page.query_selector_all(
+                ".property-features li, .section-characteristics li, "
+                ".facilities-list li, .property-main-features li, "
+                ".amenities-list li, .services-list li"
+            )
+            for item in feat_items:
+                text = (await item.inner_text()).strip()
+                if text:
+                    feature_texts.append(text)
+
+            # Also check labeled items (dt/dd pairs or key-value spans)
+            detail_items = await page.query_selector_all(".property-detail li, .technical-sheet li")
+            for item in detail_items:
+                text = (await item.inner_text()).strip()
+                if text:
+                    feature_texts.append(text)
+
+            amenities = parse_amenities_from_text(feature_texts) if feature_texts else {}
+
+            # Floor, orientation, condition from features
+            floor = None
+            orientation = None
+            condition = None
+            for text in feature_texts:
+                if floor is None:
+                    floor = parse_floor(text)
+                if orientation is None:
+                    orientation = parse_orientation(text)
+                if condition is None:
+                    condition = parse_condition(text)
+
+            # Also try the description for floor/orientation
+            if description:
+                if floor is None:
+                    floor = parse_floor(description)
+                if orientation is None:
+                    orientation = parse_orientation(description)
+                if condition is None:
+                    condition = parse_condition(description)
+
+            # Coordinates from embedded map
+            lat = None
+            lng = None
+            # Try data attributes on map container
+            map_el = await page.query_selector("[data-lat][data-lng], .map-container, #map")
+            if map_el:
+                lat_attr = await map_el.get_attribute("data-lat")
+                lng_attr = await map_el.get_attribute("data-lng")
+                lat = _safe_float(lat_attr)
+                lng = _safe_float(lng_attr)
+
+            if not lat:
+                # Try Google Maps iframe src
+                iframe = await page.query_selector("iframe[src*='maps']")
+                if iframe:
+                    src = await iframe.get_attribute("src") or ""
+                    coord_match = re.search(r"q=(-?\d+\.\d+),(-?\d+\.\d+)", src)
+                    if coord_match:
+                        lat = _safe_float(coord_match.group(1))
+                        lng = _safe_float(coord_match.group(2))
+
+            if not lat:
+                # Try script content
+                coords = await page.evaluate("""() => {
+                    const scripts = document.querySelectorAll('script');
+                    for (const s of scripts) {
+                        const text = s.textContent || '';
+                        const match = text.match(/[-]?3[4-5]\\.\\d{3,7}\\s*,\\s*[-]?5[7-9]\\.\\d{3,7}/);
+                        if (match) {
+                            const parts = match[0].split(',').map(s => s.trim());
+                            return parts;
+                        }
+                    }
+                    return null;
+                }""")
+                if coords and len(coords) == 2:
+                    lat = _safe_float(coords[0])
+                    lng = _safe_float(coords[1])
+
+            return DetailData(
+                floor=floor,
+                orientation=orientation,
+                condition=condition,
+                description=description,
+                amenities=amenities,
+                latitude=lat,
+                longitude=lng,
+            )
+        except Exception:
+            logger.exception("Detail: error scraping %s", url)
+            return None
+        finally:
+            await page.close()
 
     async def close(self) -> None:
         if self._browser:
