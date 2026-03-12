@@ -66,13 +66,10 @@ TARGET_COLUMN = "price_usd_m2"
 LOG_TARGET_COLUMN = "log_price_usd_m2"
 
 
-def filter_outliers(df: pd.DataFrame, column: str = TARGET_COLUMN, iqr_factor: float = 2.0) -> pd.DataFrame:
-    """Remove outliers using IQR method. More robust than fixed thresholds."""
-    q1 = df[column].quantile(0.05)
-    q3 = df[column].quantile(0.95)
-    iqr = q3 - q1
-    lower = q1 - iqr_factor * iqr
-    upper = q3 + iqr_factor * iqr
+def filter_outliers(df: pd.DataFrame, column: str = TARGET_COLUMN, lower_pct: float = 0.02, upper_pct: float = 0.98) -> pd.DataFrame:
+    """Remove outliers using percentile clipping. Removes extreme tails."""
+    lower = df[column].quantile(lower_pct)
+    upper = df[column].quantile(upper_pct)
     mask = (df[column] >= lower) & (df[column] <= upper)
     return df[mask]
 

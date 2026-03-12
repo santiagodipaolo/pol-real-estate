@@ -77,14 +77,16 @@ class ValuationModel:
 
         logger.info("Training on %d samples with %d features (log-target)", len(X), len(FEATURE_COLUMNS))
 
-        # Common params
+        # Common params — tuned for regularization with sparse enrichment data
         base_params = {
-            "n_estimators": 200,
-            "max_depth": 5,
-            "learning_rate": 0.1,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
-            "min_child_weight": 3,
+            "n_estimators": 300,
+            "max_depth": 4,
+            "learning_rate": 0.05,
+            "subsample": 0.7,
+            "colsample_bytree": 0.7,
+            "min_child_weight": 5,
+            "reg_alpha": 0.1,
+            "reg_lambda": 1.0,
             "random_state": 42,
         }
 
