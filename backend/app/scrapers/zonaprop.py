@@ -188,7 +188,12 @@ class ZonapropScraper(BaseScraper):
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
                 headless=self._headless,
-                args=["--disable-blink-features=AutomationControlled"],
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
             )
         return self._browser
 
@@ -199,8 +204,27 @@ class ZonapropScraper(BaseScraper):
             viewport={"width": 1920, "height": 1080},
             locale="es-AR",
             timezone_id="America/Argentina/Buenos_Aires",
+            extra_http_headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "es-AR,es;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            },
         )
         page = await context.new_page()
+
+        # Stealth: hide automation signals
+        await page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+            Object.defineProperty(navigator, 'languages', {get: () => ['es-AR', 'es', 'en']});
+            window.chrome = {runtime: {}};
+        """)
 
         # Block images and fonts to speed things up
         await page.route(
