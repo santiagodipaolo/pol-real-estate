@@ -1,12 +1,17 @@
 """Persistence pipeline — saves RawListings to the database.
 
 Handles deduplication (by source + external_id), currency conversion,
-and barrio matching via PostGIS point-in-polygon or name fuzzy match.
+barrio matching via PostGIS point-in-polygon or name fuzzy match,
+and cross-source dedup via fingerprinting.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
+import unicodedata
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -20,6 +25,59 @@ from app.models.listing import Listing
 from app.scrapers.base import RawListing
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_address(address: str | None) -> str:
+    """Normalize an address for fingerprinting.
+
+    Strips accents, lowercases, removes common abbreviations and noise.
+    'Av. Santa Fe 1234 3°B' -> 'santa fe 1234'
+    """
+    if not address:
+        return ""
+    # Remove accents
+    s = unicodedata.normalize("NFD", address)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = s.lower().strip()
+    # Remove floor/unit info (3°B, piso 5, dto A, etc.)
+    s = re.sub(r"\b(piso|dto|depto|departamento|unidad|uf|pb|ep)\b.*", "", s)
+    s = re.sub(r"\d+[°ºª]\s*[a-z]?\b", "", s)
+    # Normalize common abbreviations (longer words first to avoid partial matches)
+    s = re.sub(r"\bavenida\s+", "", s)
+    s = re.sub(r"\bboulevard\s+", "", s)
+    s = re.sub(r"\bpasaje\s+", "", s)
+    s = re.sub(r"\bcalle\s+", "", s)
+    s = re.sub(r"\bav\.?\s*", "", s)
+    s = re.sub(r"\bblvd\.?\s*", "", s)
+    s = re.sub(r"\bpje\.?\s*", "", s)
+    # Remove extra whitespace and punctuation leftovers
+    s = re.sub(r"[.,;]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _round_surface(surface: float | None) -> int:
+    """Round surface to nearest 5m² for fuzzy matching."""
+    if not surface or surface <= 0:
+        return 0
+    return round(surface / 5) * 5
+
+
+def compute_fingerprint(raw: RawListing) -> str | None:
+    """Compute a fingerprint for cross-source deduplication.
+
+    fingerprint = sha256(normalized_address | surface_5m² | rooms | operation)
+    Returns None if not enough data to fingerprint (no address or surface).
+    """
+    addr = _normalize_address(raw.address)
+    surface = _round_surface(raw.surface_total_m2)
+
+    if not addr or not surface:
+        return None
+
+    rooms = raw.rooms or 0
+    key = f"{addr}|{surface}|{rooms}|{raw.operation_type}"
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
 def _get_blue_rate() -> float | None:
@@ -84,14 +142,26 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
     created = 0
     updated = 0
     skipped = 0
+    deduped = 0
 
     with Session(engine) as session:
         # Pre-load barrio name index for fast lookups
         barrios = {b.name.lower(): b.id for b in session.query(Barrio).all()}
 
+        # Pre-load existing fingerprints for cross-source dedup
+        fp_index: dict[str, uuid.UUID] = {}
+        fp_rows = session.execute(
+            select(Listing.fingerprint, Listing.id).where(
+                Listing.fingerprint.isnot(None),
+                Listing.canonical_id.is_(None),
+            )
+        ).all()
+        for fp, lid in fp_rows:
+            fp_index[fp] = lid
+
         for raw in raw_listings:
             try:
-                # Check if listing already exists
+                # Check if listing already exists (same source)
                 existing = session.execute(
                     select(Listing).where(
                         Listing.source == raw.source,
@@ -127,6 +197,9 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
 
                 now = datetime.now(timezone.utc)
 
+                # Compute fingerprint for cross-source dedup
+                fp = compute_fingerprint(raw)
+
                 if existing:
                     # Update: refresh price, last_seen, active status
                     existing.price_original = Decimal(str(raw.price)) if raw.price else existing.price_original
@@ -145,8 +218,20 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
                         existing.longitude = Decimal(str(raw.longitude))
                     if barrio_id and not existing.barrio_id:
                         existing.barrio_id = barrio_id
+                    if fp and not existing.fingerprint:
+                        existing.fingerprint = fp
                     updated += 1
                 else:
+                    # Check cross-source duplicate via fingerprint
+                    canonical_id = None
+                    if fp and fp in fp_index:
+                        canonical_id = fp_index[fp]
+                        deduped += 1
+                        logger.debug(
+                            "Cross-source dup: %s/%s -> canonical %s (fp=%s)",
+                            raw.source, raw.external_id, canonical_id, fp,
+                        )
+
                     # Create new listing
                     listing = Listing(
                         external_id=raw.external_id,
@@ -171,6 +256,8 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
                         latitude=Decimal(str(raw.latitude)) if raw.latitude else None,
                         longitude=Decimal(str(raw.longitude)) if raw.longitude else None,
                         barrio_id=barrio_id,
+                        fingerprint=fp,
+                        canonical_id=canonical_id,
                         first_seen_at=now,
                         last_seen_at=now,
                         is_active=True,
@@ -178,6 +265,10 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
                     )
                     session.add(listing)
                     created += 1
+
+                    # Register fingerprint for this batch
+                    if fp and not canonical_id:
+                        fp_index[fp] = listing.id
 
             except Exception:
                 logger.exception("Failed to save listing %s/%s", raw.source, raw.external_id)
@@ -188,5 +279,8 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
 
     engine.dispose()
 
-    logger.info("Pipeline done: %d created, %d updated, %d skipped", created, updated, skipped)
-    return {"created": created, "updated": updated, "skipped": skipped}
+    logger.info(
+        "Pipeline done: %d created, %d updated, %d skipped, %d cross-source dups",
+        created, updated, skipped, deduped,
+    )
+    return {"created": created, "updated": updated, "skipped": skipped, "deduped": deduped}

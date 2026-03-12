@@ -16,6 +16,7 @@ class Listing(Base):
     external_id = Column(String(255), nullable=False)
     source = Column(String(50), nullable=False)
     canonical_id = Column(UUID(as_uuid=True), ForeignKey("listings.id"), nullable=True)
+    fingerprint = Column(String(64), nullable=True, index=True)
     url = Column(Text)
     title = Column(Text)
     operation_type = Column(String(20), nullable=False)
