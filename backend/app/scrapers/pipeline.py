@@ -288,7 +288,7 @@ def save_listings(raw_listings: list[RawListing]) -> dict:
     return {"created": created, "updated": updated, "skipped": skipped, "deduped": deduped}
 
 
-def enrich_listings(batch_size: int = 20, source: str | None = None) -> dict:
+async def enrich_listings(batch_size: int = 20, source: str | None = None) -> dict:
     """Enrich listings by scraping individual detail pages.
 
     Targets listings that haven't been detail-scraped yet.
@@ -384,7 +384,7 @@ def enrich_listings(batch_size: int = 20, source: str | None = None) -> dict:
             enriched += ok
             failed += fail
 
-    asyncio.run(_run_all())
+    await _run_all()
 
     # Count remaining pending
     with Session(engine) as session:
