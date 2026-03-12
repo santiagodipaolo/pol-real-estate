@@ -16,6 +16,13 @@ from typing import Any
 from playwright.async_api import Browser, Page, Playwright, async_playwright
 
 from app.scrapers.base import BaseScraper, RawListing
+from app.scrapers.detail import (
+    DetailData,
+    parse_amenities_from_text,
+    parse_condition,
+    parse_floor,
+    parse_orientation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -486,6 +493,205 @@ class ZonapropScraper(BaseScraper):
                 await asyncio.sleep(random.uniform(3, 7))
 
         return all_listings
+
+    async def scrape_detail(self, url: str) -> DetailData | None:
+        """Scrape enriched data from an individual listing page.
+
+        Tries __NEXT_DATA__ first, then falls back to DOM extraction.
+        """
+        page = await self._new_page()
+        try:
+            logger.info("Detail: fetching %s", url)
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            if not response or response.status != 200:
+                logger.warning("Detail: got status %s on %s", response.status if response else "None", url)
+                return None
+
+            await page.wait_for_timeout(random.randint(2000, 4000))
+
+            # Strategy 1: __NEXT_DATA__
+            next_data = await self._extract_next_data(page)
+            if next_data:
+                detail = self._detail_from_next_data(next_data)
+                if detail:
+                    return detail
+
+            # Strategy 2: DOM
+            return await self._detail_from_dom(page)
+
+        except Exception:
+            logger.exception("Detail: error scraping %s", url)
+            return None
+        finally:
+            await page.close()
+
+    def _detail_from_next_data(self, next_data: dict) -> DetailData | None:
+        """Extract detail data from __NEXT_DATA__ JSON."""
+        try:
+            page_props = next_data.get("props", {}).get("pageProps", {})
+            posting = page_props.get("posting", page_props.get("property", {}))
+            if not posting:
+                return None
+
+            # Location
+            geo = posting.get("postingLocation", {}).get("location", {})
+            lat = _safe_float(geo.get("lat"))
+            lng = _safe_float(geo.get("lng"))
+
+            # Main features
+            main_features = posting.get("mainFeatures", {})
+            surface_total = _safe_float(main_features.get("CFT100", main_features.get("surface")))
+            surface_covered = _safe_float(main_features.get("CFT101", main_features.get("coveredSurface")))
+            bathrooms = _safe_int(main_features.get("CFT4", main_features.get("bathrooms")))
+            garages = _safe_int(main_features.get("CFT7", main_features.get("parkingLots")))
+
+            # Expenses
+            expenses = _safe_float(posting.get("expenses", {}).get("amount"))
+
+            # Description
+            description = posting.get("description", "")
+
+            # General features (amenities, floor, orientation, condition)
+            general_features = posting.get("generalFeatures", [])
+            # Also check "features" key
+            if not general_features:
+                general_features = posting.get("features", [])
+
+            amenity_texts: list[str] = []
+            floor_text = ""
+            orientation_text = ""
+            condition_text = ""
+
+            for feat in general_features:
+                if isinstance(feat, dict):
+                    label = feat.get("label", feat.get("name", ""))
+                    value = feat.get("value", "")
+                    full = f"{label} {value}".strip()
+                elif isinstance(feat, str):
+                    full = feat
+                    label = feat
+                    value = ""
+                else:
+                    continue
+
+                full_lower = full.lower()
+                if "piso" in full_lower or "planta" in full_lower:
+                    floor_text = full
+                elif "orientación" in full_lower or "orientacion" in full_lower:
+                    orientation_text = value or full
+                elif "estado" in full_lower or "antigüedad" in full_lower or "condición" in full_lower:
+                    condition_text = value or full
+                else:
+                    amenity_texts.append(full)
+
+            # Also pull amenities from "tags" or "highlights"
+            for key in ("tags", "highlights", "amenities"):
+                tags = posting.get(key, [])
+                if isinstance(tags, list):
+                    for t in tags:
+                        if isinstance(t, str):
+                            amenity_texts.append(t)
+                        elif isinstance(t, dict):
+                            amenity_texts.append(t.get("name", t.get("label", "")))
+
+            amenities = parse_amenities_from_text(amenity_texts) if amenity_texts else {}
+            floor = parse_floor(floor_text)
+            orientation = parse_orientation(orientation_text)
+            condition = parse_condition(condition_text)
+
+            return DetailData(
+                floor=floor,
+                orientation=orientation,
+                condition=condition,
+                description=description[:5000] if description else None,
+                amenities=amenities,
+                latitude=lat,
+                longitude=lng,
+                surface_total_m2=surface_total,
+                surface_covered_m2=surface_covered,
+                bathrooms=bathrooms,
+                garages=garages,
+                expenses_ars=expenses,
+            )
+        except Exception:
+            logger.exception("Detail: failed to parse __NEXT_DATA__")
+            return None
+
+    async def _detail_from_dom(self, page: Page) -> DetailData | None:
+        """Extract detail data from the listing detail DOM."""
+        try:
+            # Description
+            desc_el = await page.query_selector('[data-qa="POSTING_DESCRIPTION"]')
+            if not desc_el:
+                desc_el = await page.query_selector(".section-description--content")
+            description = (await desc_el.inner_text()).strip()[:5000] if desc_el else None
+
+            # Feature items — look for feature sections
+            feature_texts: list[str] = []
+            feat_items = await page.query_selector_all('[data-qa="POSTING_FEATURE"] li, .feature-item, .icon-feature')
+            for item in feat_items:
+                text = (await item.inner_text()).strip()
+                if text:
+                    feature_texts.append(text)
+
+            # Also grab general info sections
+            general_items = await page.query_selector_all(".general-features li, .property-features li, .section-characteristics li")
+            for item in general_items:
+                text = (await item.inner_text()).strip()
+                if text:
+                    feature_texts.append(text)
+
+            amenities = parse_amenities_from_text(feature_texts) if feature_texts else {}
+
+            # Floor and orientation from features
+            floor = None
+            orientation = None
+            condition = None
+            for text in feature_texts:
+                if floor is None:
+                    floor = parse_floor(text)
+                if orientation is None:
+                    orientation = parse_orientation(text)
+                if condition is None:
+                    condition = parse_condition(text)
+
+            # Coordinates from map or meta
+            lat = None
+            lng = None
+            map_el = await page.query_selector('[data-qa="POSTING_MAP"]')
+            if map_el:
+                lat_attr = await map_el.get_attribute("data-lat")
+                lng_attr = await map_el.get_attribute("data-lng")
+                lat = _safe_float(lat_attr)
+                lng = _safe_float(lng_attr)
+
+            if not lat:
+                # Try extracting from script tags with coordinates
+                scripts = await page.evaluate("""() => {
+                    const scripts = document.querySelectorAll('script');
+                    for (const s of scripts) {
+                        const text = s.textContent || '';
+                        const match = text.match(/"lat"\\s*:\\s*(-?\\d+\\.\\d+).*?"lng"\\s*:\\s*(-?\\d+\\.\\d+)/);
+                        if (match) return [match[1], match[2]];
+                    }
+                    return null;
+                }""")
+                if scripts:
+                    lat = _safe_float(scripts[0])
+                    lng = _safe_float(scripts[1])
+
+            return DetailData(
+                floor=floor,
+                orientation=orientation,
+                condition=condition,
+                description=description,
+                amenities=amenities,
+                latitude=lat,
+                longitude=lng,
+            )
+        except Exception:
+            logger.exception("Detail: DOM extraction failed")
+            return None
 
     async def close(self) -> None:
         if self._browser:

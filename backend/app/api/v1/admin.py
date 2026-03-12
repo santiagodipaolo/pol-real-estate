@@ -80,6 +80,7 @@ def _run_retrain_sync(operation: str) -> dict:
             l.surface_total_m2, l.surface_covered_m2,
             l.rooms, l.bedrooms, l.bathrooms, l.garages, l.age_years,
             l.barrio_id, l.latitude, l.longitude, l.days_on_market,
+            l.floor, l.orientation, l.condition, l.amenities,
             b.name as barrio_name
         FROM listings l
         LEFT JOIN barrios b ON l.barrio_id = b.id
@@ -148,6 +149,8 @@ def _background_pipeline(
     max_pages: int,
     retrain: bool,
     fetch_rates: bool,
+    enrich: bool = False,
+    enrich_batch_size: int = 20,
 ) -> None:
     """Run the full pipeline in background."""
     _update_status("pipeline", "running")
@@ -169,7 +172,15 @@ def _background_pipeline(
             _update_status(f"scrape_{op}", "ok", result)
             logger.info("Pipeline: %s scrape done: %s", op, result)
 
-        # 3. Retrain
+        # 3. Enrich detail pages
+        enrich_result = {}
+        if enrich:
+            logger.info("Pipeline: enriching %d listings...", enrich_batch_size)
+            enrich_result = _run_enrich_sync(enrich_batch_size, None)
+            _update_status("enrich", "ok", enrich_result)
+            logger.info("Pipeline: enrich done: %s", enrich_result)
+
+        # 4. Retrain
         retrain_results = {}
         if retrain:
             for op in operations:
@@ -189,6 +200,7 @@ def _background_pipeline(
 
         _update_status("pipeline", "completed", {
             "scrape": scrape_results,
+            "enrich": enrich_result,
             "retrain": retrain_results,
         })
         logger.info("Pipeline completed successfully")
@@ -261,9 +273,11 @@ async def pipeline(
     fetch_rates: bool = True,
     sale: bool = True,
     rent: bool = True,
+    enrich: bool = False,
+    enrich_batch_size: int = 20,
     _: None = Depends(_verify_admin_key),
 ):
-    """Run the full pipeline: fetch rates -> scrape -> retrain. Runs in background."""
+    """Run the full pipeline: fetch rates -> scrape -> enrich -> retrain. Runs in background."""
     operations = []
     if sale:
         operations.append("sale")
@@ -273,7 +287,8 @@ async def pipeline(
         raise HTTPException(400, "At least one operation (sale/rent) must be enabled")
 
     background_tasks.add_task(
-        _background_pipeline, operations, max_pages, retrain, fetch_rates
+        _background_pipeline, operations, max_pages, retrain, fetch_rates,
+        enrich, enrich_batch_size,
     )
     return {
         "status": "started",
@@ -281,7 +296,42 @@ async def pipeline(
         "max_pages": max_pages,
         "retrain": retrain,
         "fetch_rates": fetch_rates,
+        "enrich": enrich,
+        "enrich_batch_size": enrich_batch_size,
     }
+
+
+@router.post("/enrich")
+async def enrich(
+    background_tasks: BackgroundTasks,
+    batch_size: int = 20,
+    source: str | None = None,
+    _: None = Depends(_verify_admin_key),
+):
+    """Enrich listings by scraping detail pages. Runs in background."""
+    if batch_size < 1 or batch_size > 200:
+        raise HTTPException(400, "batch_size must be 1-200")
+    if source and source not in ("zonaprop", "argenprop"):
+        raise HTTPException(400, "source must be 'zonaprop' or 'argenprop'")
+
+    _update_status("enrich", "running")
+    background_tasks.add_task(_run_enrich_bg, batch_size, source)
+    return {"status": "started", "batch_size": batch_size, "source": source}
+
+
+async def _run_enrich_bg(batch_size: int, source: str | None):
+    try:
+        result = _run_enrich_sync(batch_size, source)
+        _update_status("enrich", "ok", result)
+        logger.info("Enrich done: %s", result)
+    except Exception as exc:
+        _update_status("enrich", "failed", {"error": str(exc)})
+        logger.exception("Enrich failed")
+
+
+def _run_enrich_sync(batch_size: int, source: str | None) -> dict:
+    from app.scrapers.pipeline import enrich_listings
+    return enrich_listings(batch_size=batch_size, source=source)
 
 
 @router.get("/status")

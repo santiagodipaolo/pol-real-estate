@@ -146,6 +146,10 @@ class ValuationModel:
         property_type: str = "Departamento",
         barrio_id: int | None = None,
         surface_covered_m2: float | None = None,
+        floor: int | None = None,
+        orientation: str | None = None,
+        condition: str | None = None,
+        amenities: dict | None = None,
     ) -> dict:
         """Predict the valuation for a single property.
 
@@ -168,6 +172,10 @@ class ValuationModel:
             "property_type": property_type,
             "barrio_id": barrio_id,
             "price_usd_blue": 0,  # Placeholder, not used for prediction
+            "floor": floor,
+            "orientation": orientation,
+            "condition": condition,
+            "amenities": amenities or {},
         }])
 
         row_feat = engineer_features(row, barrio_stats=self.barrio_stats)

@@ -19,6 +19,17 @@ PROPERTY_TYPE_MAP = {
     "Terreno": 5,
 }
 
+# Condition encoding (ordinal — reflects typical price hierarchy)
+CONDITION_MAP = {
+    "Nuevo": 5,
+    "Excelente": 4,
+    "Muy bueno": 3,
+    "Bueno": 2,
+    "Regular": 1,
+    "A reciclar": 0,
+    "En construccion": 3,
+}
+
 # Features used by the model
 FEATURE_COLUMNS = [
     "surface_total_m2",
@@ -34,6 +45,15 @@ FEATURE_COLUMNS = [
     "barrio_listing_count",
     "covered_ratio",
     "has_garage",
+    # Detail-enriched features
+    "floor",
+    "has_pool",
+    "has_gym",
+    "has_security",
+    "has_balcony",
+    "is_front",
+    "condition_encoded",
+    "amenity_count",
 ]
 
 TARGET_COLUMN = "price_usd_m2"
@@ -75,6 +95,45 @@ def engineer_features(df: pd.DataFrame, barrio_stats: pd.DataFrame | None = None
 
     # Has garage
     df["has_garage"] = (df["garages"].fillna(0) > 0).astype(int)
+
+    # Detail-enriched features
+    df["floor"] = df["floor"].fillna(0).astype(int)
+
+    # Amenity flags — extract from JSONB amenities column
+    def _amenity_bool(col_name: str, amenity_key: str) -> None:
+        if "amenities" in df.columns:
+            df[col_name] = df["amenities"].apply(
+                lambda a: int(isinstance(a, dict) and a.get(amenity_key, False))
+            )
+        else:
+            df[col_name] = 0
+
+    _amenity_bool("has_pool", "pool")
+    _amenity_bool("has_gym", "gym")
+    _amenity_bool("has_security", "security")
+    _amenity_bool("has_balcony", "balcony")
+
+    # Is front (orientation)
+    if "orientation" in df.columns:
+        df["is_front"] = df["orientation"].apply(
+            lambda o: 1 if isinstance(o, str) and o.lower() in ("frente", "n", "ne", "no") else 0
+        )
+    else:
+        df["is_front"] = 0
+
+    # Condition encoded
+    if "condition" in df.columns:
+        df["condition_encoded"] = df["condition"].map(CONDITION_MAP).fillna(2).astype(int)
+    else:
+        df["condition_encoded"] = 2  # default "Bueno"
+
+    # Amenity count
+    if "amenities" in df.columns:
+        df["amenity_count"] = df["amenities"].apply(
+            lambda a: sum(1 for v in a.values() if v) if isinstance(a, dict) else 0
+        )
+    else:
+        df["amenity_count"] = 0
 
     # Barrio stats
     if barrio_stats is None:
